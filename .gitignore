@@ -1,0 +1,12 @@
+/dist/
+/WTF/
+/SavedVariables/
+/TEMP/
+/Fremd_Addons/
+/snapshots/
+*.zip
+*.bak
+*~
+.DS_Store
+.env
+.env.*

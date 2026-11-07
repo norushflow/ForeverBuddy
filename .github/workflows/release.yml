@@ -1,0 +1,50 @@
+name: WowUp Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    env:
+      ADDON: Foreverbuddy
+      ZIP_SUFFIX: '-forever'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Check version tag
+        shell: bash
+        run: |
+          version=$(awk '/^## Version:/ {gsub(/\r/, ""); print $3}' "$ADDON.toc")
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Git tag must match the version in $ADDON.toc."
+            exit 1
+          fi
+          echo "ADDON_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Install packaging dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq luajit zip unzip
+
+      - name: Test and package
+        shell: bash
+        run: |
+          ./tools/package.sh
+          if [[ -n "$ZIP_SUFFIX" ]]; then
+            mv -- "dist/$ADDON-$ADDON_VERSION.zip" "dist/$ADDON-$ADDON_VERSION$ZIP_SUFFIX.zip"
+          fi
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "dist/$ADDON-$ADDON_VERSION$ZIP_SUFFIX.zip" \
+            --verify-tag --title "$ADDON $ADDON_VERSION" --generate-notes
