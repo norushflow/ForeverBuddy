@@ -16,15 +16,13 @@ function B.Now()
     return B.Number(value) and value or 0
 end
 function B.Context()
-    local _,class = B.Call(UnitClass,"player")
-    local index=B.Call(GetSpecialization)
-    if not B.Text(class) or not B.Number(index) then return end
-    local spec,label=B.Call(GetSpecializationInfo,index)
+    local label,class = B.Call(UnitClass,"player")
+    if not B.Text(class) then return end
     local guid=B.Call(UnitGUID,"player")
     local name,realm=B.Call(UnitFullName,"player")
-    if not B.Number(spec) or not B.Text(guid) or not B.Text(name) then return end
+    if not B.Text(guid) or not B.Text(name) then return end
     if not B.Text(realm) then realm=B.Call(GetRealmName) end
-    return class,spec,guid,name..(B.Text(realm) and ("-"..realm) or ""),B.Text(label) and label or tostring(spec)
+    return class,"default",guid,name..(B.Text(realm) and ("-"..realm) or ""),B.Text(label) and label or class
 end
 
 -- Alle Leistenplätze 1-180: Hauptleiste mit beiden Seiten, Leisten 2-5,
@@ -211,4 +209,35 @@ function B.Pick(entry)
     else return false end
     local ok,cursor=pcall(GetCursorInfo)
     return ok and B.Public(cursor) and cursor~=nil
+end
+
+-- Native Klickzauber: nur öffentliche, vollständige Daten übernehmen.
+-- Eine Kopie verhindert, dass der Client die gespeicherte Vorlage verändert.
+function B.CopyClickBindings(info)
+    if not B.Table(info) then return end
+    local result={}
+    for index,entry in pairs(info) do
+        if not B.Number(index) or index<1 or index%1~=0 or not B.Table(entry)
+            or not B.Number(entry.type) or not B.Number(entry.actionID)
+            or not B.Text(entry.button) or not B.Number(entry.modifiers) then return end
+        result[index]={type=entry.type,actionID=entry.actionID,
+            button=entry.button,modifiers=entry.modifiers}
+    end
+    for index=1,#result do if not result[index] then return end end
+    local count=0
+    for _ in pairs(result) do count=count+1 end
+    if count~=#result then return end
+    return result
+end
+function B.ReadClickBindings()
+    return B.CopyClickBindings(B.Call(C_ClickBindings and C_ClickBindings.GetProfileInfo))
+end
+function B.ApplyClickBindings(profile)
+    -- Alte Vorlagen ohne Klickzauber verändern die aktuelle Belegung nicht.
+    if profile.clickBindings==nil then return true end
+    local info=B.CopyClickBindings(profile.clickBindings)
+    if not info then return false end
+    if not C_ClickBindings or type(C_ClickBindings.SetProfileByInfo)~="function" then return false end
+    if B.Reason() then return false end
+    return pcall(C_ClickBindings.SetProfileByInfo,info)
 end

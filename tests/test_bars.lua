@@ -53,17 +53,20 @@ local function fire(event,arg)
     end
 end
 
--- Umgebung: eine Spielfigur mit zwei Spezialisierungen.
-local specIndex=1
-local specs={[1]={2544,"Überleben"},[2]={2533,"Treffsicherheit"}}
+-- Forever hat keine Spezialisierungs-API.
 function UnitClass() return "Jäger","HUNTER" end
 function UnitGUID() return "Player-1-ABC" end
 function UnitFullName() return "Buddy","Realm" end
 function GetRealmName() return "Realm" end
-function GetSpecialization() return specIndex end
-function GetSpecializationInfo(index)
-    local entry=specs[index]
-    if entry then return entry[1],entry[2],"Beschreibung",1 end
+local clicks={{type=1,actionID=133,button="LeftButton",modifiers=0}}
+C_ClickBindings={
+    GetProfileInfo=function() return clicks end,
+    SetProfileByInfo=function(info) clicks=info end,
+    ResetCurrentProfile=function() clicks={} end,
+}
+function hooksecurefunc(api,key,hook)
+    local original=api[key]
+    api[key]=function(...) original(...);hook(...) end
 end
 function GetServerTime() return 1000 end
 
@@ -163,7 +166,7 @@ assert(B.Settable(120) and not B.Settable(121) and not B.Settable(144) and B.Set
 fire('PLAYER_LOGIN');drain()
 assert(B.ready and B.db.automatic==true,'login establishes context and enables automatic mode')
 assert(B.note:find('Keine Vorlage'),'missing profile reported in menu note')
-assert(B.class=='HUNTER' and B.spec==2544)
+assert(B.class=='HUNTER' and B.spec=="default")
 
 -- Ausgangsbelegung speichern. Platz 4 ist ein Charaktermakro, Platz 13 ein
 -- accountweites Makro, das vollständig ignoriert werden muss.
@@ -175,7 +178,7 @@ bar[6]={action="unknown",value=1}
 bar[7]={action="equipmentset",value="Raid"}
 bar[13]={action="macro",index=1,value="Raid"}
 assert(B.Save(true),'explicit save succeeds')
-local profile=Buddy.db.bars.library.HUNTER[2544]
+local profile=Buddy.db.bars.library.HUNTER.default
 assert(profile and profile.actions[1].value==133 and profile.actions[2].value==5512,'spell and item saved')
 assert(profile.actions[3].action=='empty' and profile.actions[4].value=='Extra','empty and character macro saved')
 assert(profile.actions[13]==nil,'account macro is not stored')
@@ -183,7 +186,7 @@ assert(not B.note:find('nicht lesbar'),'account macro is not reported as unreada
 assert(B.note:find('allgemeines Makro ignoriert'),'account macro is reported as ignored')
 assert(profile.actions[5].action=='flyout' and profile.actions[7].value=='Raid','flyout and equipment set saved')
 assert(profile.actions[6].action=='keep','unknown action type is never stored as empty')
-assert(profile.specialization=='Überleben' and profile.editor=='Buddy-Realm','profile metadata')
+assert(profile.specialization==nil and profile.editor=='Buddy-Realm','profile metadata')
 assert(messages[#messages]:find('gespeichert'),'save announces success')
 
 -- Makrobereich: 1..18 accountweit, ab 19 charakterspezifisch.
@@ -300,18 +303,44 @@ bar[15]=nil
 fire('ACTIONBAR_SLOT_CHANGED',15);drain()
 assert(profile.actions[15] and profile.actions[15].action=='empty','empty slot is stored again')
 
--- Spezialisierungswechsel lädt automatisch die passende Vorlage.
+-- Spezialisierungsereignisse haben keinen Einfluss auf die gemeinsame Vorlage.
 now=now+5
-specIndex=2
 fire('PLAYER_SPECIALIZATION_CHANGED','player');drain()
-assert(B.spec==2533 and B.note:find('Keine Vorlage'),'second specialization has no profile yet')
-bar[1]={action="spell",value=1943}
-assert(B.Save(true),'second specialization saves')
-assert(Buddy.db.bars.library.HUNTER[2533].actions[1].value==1943)
-now=now+5
-specIndex=1
-fire('PLAYER_SPECIALIZATION_CHANGED','player');drain()
-assert(B.spec==2544 and bar[1].value==100,'returning to a specialization loads its profile')
+assert(B.Profile()==profile and B.spec=="default")
+
+-- Klickzauber werden kopiert, wiederhergestellt und automatisch gespeichert.
+assert(profile.clickBindings[1].actionID==133 and profile.clickBindings~=clicks)
+clicks[1].actionID=1943
+assert(profile.clickBindings[1].actionID==133,'client mutation does not alter saved clicks')
+assert(B.Apply(true) and clicks[1].actionID==133,'click bindings restored with bars')
+assert(clicks~=profile.clickBindings,'apply passes a copy')
+C_ClickBindings.SetProfileByInfo({{type=1,actionID=100,button="RightButton",modifiers=2}});drain()
+assert(profile.clickBindings[1].actionID==100,'click-only edit automatically saved')
+combat=true
+C_ClickBindings.SetProfileByInfo({});drain()
+assert(#profile.clickBindings==1,'click changes wait during combat')
+combat=false
+fire('PLAYER_REGEN_ENABLED');drain()
+assert(#profile.clickBindings==0,'empty click profile saved after combat')
+C_ClickBindings.SetProfileByInfo({{type=1,actionID=100,button="RightButton",modifiers=0}});drain()
+C_ClickBindings.ResetCurrentProfile();drain()
+assert(#profile.clickBindings==0,'reset automatically saved')
+clicks={{type=1,actionID=133,button="LeftButton",modifiers=0}}
+assert(B.Apply(true) and #clicks==0,'empty profile clears click bindings')
+local clickAPI=C_ClickBindings
+C_ClickBindings=nil
+assert(B.Apply(true) and B.note:find('Klickzauber konnten nicht geladen'),
+    'missing click API reports partial load while bars still load')
+C_ClickBindings=clickAPI
+local oldClicks=profile.clickBindings
+profile.clickBindings=nil
+clicks={{type=1,actionID=133,button="LeftButton",modifiers=0}}
+assert(B.Apply(true) and #clicks==1,'legacy profile leaves clicks alone')
+profile.clickBindings=oldClicks
+assert(not B.CopyClickBindings({{type=1,actionID=secret,button="LeftButton",modifiers=0}}),
+    'secret click data is rejected')
+assert(not B.CopyClickBindings({[2]={type=1,actionID=133,button="LeftButton",modifiers=0}}),
+    'sparse click data is rejected')
 
 -- Automatik aus: keine automatischen Schreibläufe; Einschalten lädt erneut.
 B.menuButton=object()
@@ -328,7 +357,7 @@ assert(B.menuButton.text=='Aktionsleisten · Automatik AN' and bar[1].value==100
 -- Menübereich im bestehenden Fenster.
 local menuHeight=B.BuildMenu(object(),-100)
 assert(menuHeight==B.MENU_HEIGHT and B.menuStatus.text:find('Automatik AN')
-    and B.menuStatus.text:find('Überleben'),'inline menu shows state and specialization')
+    and B.menuStatus.text:find('Jäger'),'inline menu shows state and specialization')
 assert(B.menuNote.text==B.note,'inline menu shows the last note')
 local saveButton,loadButton
 for _,frame in ipairs(frames) do
@@ -359,7 +388,7 @@ fire('PLAYER_REGEN_ENABLED');drain()
 assert(not B.pending and bar[1].value==100,'deferred apply resumes after combat')
 
 -- Kampfbeginn mitten im Laden: der Rest wird nach dem Kampfende nachgeholt.
-local expected=Buddy.db.bars.library.HUNTER[2544].actions[2]
+local expected=Buddy.db.bars.library.HUNTER.default.actions[2]
 bar[1]={action="spell",value=1};bar[2]={action="spell",value=2}
 local realPlace=PlaceAction;local placeCalls=0
 PlaceAction=function(slot)
@@ -378,7 +407,7 @@ assert(not B.pending and bar[2].action==expected.action and bar[2].value==expect
 -- Klassen-/Haltungsleisten werden geladen, Besitz-/reservierte Plätze nur gespeichert.
 bar[73]={action="spell",value=100};bar[121]={action="spell",value=7}
 assert(B.Save(true),'save covers class and possess slots')
-local saved=Buddy.db.bars.library.HUNTER[2544]
+local saved=Buddy.db.bars.library.HUNTER.default
 assert(saved.actions[73].value==100,'class bar slot is saved')
 assert(saved.actions[121].value==7 and not B.Settable(121),'possess slot is stored but read-only')
 bar[73]={action="spell",value=5}
@@ -386,10 +415,10 @@ assert(B.Apply(true) and bar[73].value==100,'class bar slot is loaded')
 assert(bar[121].value==7,'possess slot is never written')
 
 -- Geheime Werte: weder Speichern noch automatisches Speichern verwenden sie.
-local before=Buddy.db.bars.library.HUNTER[2544]
+local before=Buddy.db.bars.library.HUNTER.default
 bar[10]={action="secret",value=secret}
 assert(B.Save(true),'save skips a secret slot instead of aborting')
-local saved=Buddy.db.bars.library.HUNTER[2544]
+local saved=Buddy.db.bars.library.HUNTER.default
 assert(saved and saved~=before and saved.actions[10]==nil,'secret slot is not stored')
 assert(saved.actions[1] and saved.actions[1].value==100,'other slots are still saved')
 assert(B.note:find('nicht lesbar') and B.note:find('10') and B.note:find('geschützter Wert'),'note names the unreadable slot and reason')
@@ -397,12 +426,21 @@ bar[10]=nil
 now=now+5
 bar[10]={action="secret",value=secret}
 fire('ACTIONBAR_SLOT_CHANGED',10);drain()
-assert(Buddy.db.bars.library.HUNTER[2544]==saved,'automatic save ignores secret slot data')
+assert(Buddy.db.bars.library.HUNTER.default==saved,'automatic save ignores secret slot data')
 bar[10]=nil
 local getInfo=GetActionInfo
 GetActionInfo=function() error('blocked') end
 assert(not B.Save(true) and B.note:find('kein Leistenplatz lesbar'),'save aborts when no slot is readable')
 GetActionInfo=getInfo
+
+-- Ein Lesefehler darf die zuletzt gespeicherten Klickzauber nicht löschen.
+local retained=saved.clickBindings
+local readClicks=C_ClickBindings.GetProfileInfo
+C_ClickBindings.GetProfileInfo=function() error('unavailable') end
+assert(B.Save(true) and B.Profile().clickBindings==retained,'failed read preserves click bindings')
+assert(B.note:find('Klickzauber nicht lesbar'),'failed read reported')
+saved=B.Profile()
+C_ClickBindings.GetProfileInfo=readClicks
 
 -- Anmeldung mit vorhandener Vorlage lädt automatisch.
 now=now+5
@@ -416,7 +454,7 @@ now=now+5
 bar[11]={action="spell",value=100}
 fire('ACTIONBAR_SLOT_CHANGED',11);drain()
 assert(saved.actions[11].value==100,'last change saved before logout')
-assert(B.events.events.PLAYER_LOGOUT and B.events.events.PLAYER_SPECIALIZATION_CHANGED
+assert(B.events.events.PLAYER_LOGOUT and not B.events.events.PLAYER_SPECIALIZATION_CHANGED
     and B.events.events.ACTIONBAR_SLOT_CHANGED,'required events are registered')
 
-print('PASS: bar profiles, automatic save/load, spec switching, guards, secrets and inline menu')
+print('PASS: bar profiles, automatic save/load, click bindings, guards, secrets and inline menu')

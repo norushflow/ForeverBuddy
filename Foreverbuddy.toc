@@ -2,7 +2,7 @@
 ## Title: Foreverbuddy
 ## Notes: Charaktere, Transmog, Schadensanzeige und Aktionsleisten für Forever.
 ## Author: Basti
-## Version: 1.0.0
+## Version: 1.0.1
 ## IconTexture: Interface\AddOns\Foreverbuddy\Media\BuddyIcon
 ## SavedVariables: ForeverbuddyDB
 ## SavedVariablesPerCharacter: ForeverbuddyCharDB

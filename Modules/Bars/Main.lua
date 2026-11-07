@@ -41,10 +41,10 @@ function Buddy.LoadBars()
             if announce then Buddy.Message("Leisten werden noch eingelesen") end
             return false
         end
-        local _,class,spec,_,name,label=B.Profile()
+        local previous,class,spec,_,name,label=B.Profile()
         if not class then
-            B.SetNote("Keine Spezialisierung erkannt")
-            if announce then Buddy.Message("Keine Spezialisierung erkannt") end
+            B.SetNote("Keine Klasse erkannt")
+            if announce then Buddy.Message("Keine Klasse erkannt") end
             return false
         end
         local actions, unreadable, ignored = {}, {}, 0
@@ -75,12 +75,19 @@ function Buddy.LoadBars()
         if ignored>0 then
             notes[#notes+1]=ignored..(ignored==1 and " allgemeines Makro ignoriert" or " allgemeine Makros ignoriert")
         end
+        local clicks=B.ReadClickBindings()
+        if not clicks then
+            clicks=B.Table(previous) and previous.clickBindings or nil
+            notes[#notes+1]=clicks and "Klickzauber nicht lesbar; bisherige Belegung bleibt gespeichert"
+                or "Klickzauber konnten nicht gespeichert werden"
+        end
         local details=#notes>0 and (" · "..table.concat(notes," · ")) or ""
-        local profile={actions=actions,specialization=label}
+        local profile={actions=actions,clickBindings=clicks}
         stamp(profile,name)
         B.db.library[class]=B.Table(B.db.library[class]) and B.db.library[class] or {}
         B.db.library[class][spec]=profile
         B.dirty={}
+        B.clicksDirty=nil
         B.SetNote("Vorlage gespeichert"..details)
         if announce then Buddy.Message("Vorlage für "..(label or tostring(spec)).." gespeichert"..details) end
         return true
@@ -88,7 +95,7 @@ function Buddy.LoadBars()
 
     function B.Flush()
         if not B.db.automatic or not B.ready or B.busy or B.pending then return end
-        if not next(B.dirty) then return end
+        if not next(B.dirty) and not B.clicksDirty then return end
         local reason=B.Reason()
         if reason then B.SetNote(reason);return end
         local profile,class,spec,_,name=B.Profile()
@@ -97,6 +104,10 @@ function Buddy.LoadBars()
             B.dirty={};return
         end
         local changed=false
+        if B.clicksDirty then
+            local clicks=B.ReadClickBindings()
+            if clicks then profile.clickBindings=clicks;changed=true;B.clicksDirty=nil end
+        end
         for slot in pairs(B.dirty) do
             local entry=B.Read(slot)
             if B.Table(entry) and entry.action=="ignored" then
@@ -122,10 +133,10 @@ function Buddy.LoadBars()
     function B.Apply(announce)
         local profile,class,spec,_,_,label=B.Profile()
         if not class then
-            B.pending=nil;B.SetNote("Keine Spezialisierung erkannt");return false
+            B.pending=nil;B.SetNote("Keine Klasse erkannt");return false
         end
         if not B.Table(profile) or not B.Table(profile.actions) then
-            B.pending=nil;B.SetNote("Keine Vorlage für diese Spezialisierung");return false
+            B.pending=nil;B.SetNote("Keine Vorlage für diese Klasse");return false
         end
         local reason=B.Reason()
         if reason then
@@ -144,8 +155,9 @@ function Buddy.LoadBars()
             if announce then Buddy.Message("Mauszeiger ist belegt; nichts geändert") end
             return false
         end
-        B.pending=nil;B.busy=true;B.dirty={}
+        B.pending=nil;B.busy=true;B.dirty={};B.clicksDirty=nil
         local skipped,changed,ignored=0,0,0
+        local clicksLoaded=true
         local missingMacros={}
         local ok=pcall(function()
             B.ClearCursor()
@@ -192,6 +204,8 @@ function Buddy.LoadBars()
                     end
                 end
             end
+            if B.Reason() then error("barrier") end
+            clicksLoaded=B.ApplyClickBindings(profile)
         end)
         B.ClearCursor()
         B.busy=false
@@ -202,6 +216,7 @@ function Buddy.LoadBars()
         B.ignoreUntil=B.Now()+1.5
         if ok then
             local details={}
+            if not clicksLoaded then details[#details+1]="Klickzauber konnten nicht geladen werden" end
             if #missingMacros>0 then
                 local shown={}
                 for index=1,math.min(#missingMacros,5) do shown[index]=missingMacros[index] end
@@ -237,7 +252,7 @@ function Buddy.LoadBars()
         C_Timer.After(delay or .5,function()
             retryQueued=false
             if B.pending and not B.busy then B.Apply(false) end
-            if next(B.dirty) then B.QueueFlush(0) end
+            if next(B.dirty) or B.clicksDirty then B.QueueFlush(0) end
         end)
     end
 
@@ -248,7 +263,7 @@ function Buddy.LoadBars()
         B.ready=true
         B.dirty={}
         if not class then
-            B.SetNote("Keine Spezialisierung erkannt")
+            B.SetNote("Keine Klasse erkannt")
         elseif B.db.automatic then
             B.Apply(false)
         else
@@ -267,7 +282,7 @@ function Buddy.LoadBars()
 
     function B.SetAutomatic(enabled)
         B.db.automatic=enabled and true or false
-        B.pending=nil;B.dirty={}
+        B.pending=nil;B.dirty={};B.clicksDirty=nil
         B.SetNote(B.db.automatic and "Automatik an" or "Automatik aus")
         if B.db.automatic then B.QueueLoad(.3) end
     end
@@ -276,7 +291,7 @@ function Buddy.LoadBars()
         local profile,_,_,_,_,label=B.Profile()
         local state=B.db.automatic and "Automatik AN" or "Automatik AUS"
         local suffix=B.Table(profile) and "Vorlage vorhanden" or "keine Vorlage"
-        return state,label or "Keine Spezialisierung erkannt",suffix,B.Table(profile) and profile or nil
+        return state,label or "Keine Klasse erkannt",suffix,B.Table(profile) and profile or nil
     end
 
     -- Kompakte Bedienung im bestehenden Buddy-Menü; kein eigenes Fenster.
@@ -326,14 +341,25 @@ function Buddy.LoadBars()
     SlashCmdList.FOREVERBUDDYBARS=B.Command
     SLASH_FOREVERBUDDYBARS1="/fbbars"
 
+    if C_ClickBindings and type(hooksecurefunc)=="function" then
+        local function clicksChanged()
+            if not B.db.automatic or not B.ready or B.busy or B.pending then return end
+            B.clicksDirty=true
+            B.QueueFlush()
+        end
+        for _,method in ipairs({"SetProfileByInfo","ResetCurrentProfile"}) do
+            if type(C_ClickBindings[method])=="function" then
+                hooksecurefunc(C_ClickBindings,method,clicksChanged)
+            end
+        end
+    end
+
     B.events=CreateFrame("Frame")
     B.events:SetScript("OnEvent",function(_,event,arg)
         if event=="PLAYER_LOGIN" then
             B.QueueLoad(1.5)
         elseif event=="PLAYER_ENTERING_WORLD" then
             if not B.loadedOnce and not loadQueued then B.QueueLoad(.5) end
-        elseif event=="PLAYER_SPECIALIZATION_CHANGED" then
-            if B.Public(arg) and arg=="player" then B.QueueLoad(1) end
         elseif event=="ACTIONBAR_SLOT_CHANGED" then
             if not B.db.automatic or not B.ready or B.busy or B.pending then return end
             if B.Now()<B.ignoreUntil then return end
@@ -347,12 +373,12 @@ function Buddy.LoadBars()
             or event=="UPDATE_OVERRIDE_ACTIONBAR" or event=="UPDATE_VEHICLE_ACTIONBAR"
             or event=="UPDATE_POSSESS_BAR" or event=="UPDATE_SHAPESHIFT_FORM"
             or event=="UPDATE_BONUS_ACTIONBAR" then
-            if not B.busy and (B.pending or next(B.dirty)) then B.QueueRetry() end
+            if not B.busy and (B.pending or next(B.dirty) or B.clicksDirty) then B.QueueRetry() end
         elseif event=="PLAYER_LOGOUT" then
             B.Flush()
         end
     end)
-    for _,event in ipairs({"PLAYER_LOGIN","PLAYER_ENTERING_WORLD","PLAYER_SPECIALIZATION_CHANGED",
+    for _,event in ipairs({"PLAYER_LOGIN","PLAYER_ENTERING_WORLD",
         "ACTIONBAR_SLOT_CHANGED","PLAYER_REGEN_ENABLED","CURSOR_CHANGED","UPDATE_OVERRIDE_ACTIONBAR",
         "UPDATE_VEHICLE_ACTIONBAR","UPDATE_POSSESS_BAR","UPDATE_SHAPESHIFT_FORM",
         "UPDATE_BONUS_ACTIONBAR","PLAYER_LOGOUT"}) do
