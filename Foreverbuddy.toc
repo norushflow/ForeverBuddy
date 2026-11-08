@@ -2,7 +2,8 @@
 ## Title: ForeverBuddy
 ## Notes: Charaktere, Transmog, Schadensanzeige, Aktionsleisten und Berufspost für Forever.
 ## Author: norushflow
-## Version: 1.1.2
+## Version: 1.1.3
+## X-Curse-Project-ID: 1791314
 ## IconTexture: Interface\AddOns\Foreverbuddy\Media\BuddyIcon
 ## SavedVariables: ForeverbuddyDB
 ## SavedVariablesPerCharacter: ForeverbuddyCharDB

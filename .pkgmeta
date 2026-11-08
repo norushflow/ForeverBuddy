@@ -1,0 +1,11 @@
+package-as: Foreverbuddy
+ignore:
+  - AGENTS.md
+  - CHANGELOG.md
+  - DEVELOPMENT.md
+  - README.md
+  - SECURITY.md
+  - branding
+  - docs
+  - tests
+  - tools
