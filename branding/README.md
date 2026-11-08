@@ -8,7 +8,7 @@
 
 Unter **Settings → General → Social preview → Edit → Upload an image** die Datei `github-social-preview.png` auswählen. Ein Bild im Repository oder im README setzt diese Einstellung nicht automatisch.
 
-WowUp Hub verwendet das Social-Preview-Bild, ersatzweise den Besitzer-Avatar. Bei privaten Repositories gelten GitHubs Einschränkungen: Ein erstmaliger Social-Preview-Upload ist laut Dokumentation nur für öffentliche Repositories möglich; bei privaten nur, wenn bereits zuvor ein Bild hochgeladen wurde. Die Repositories nicht allein für das Icon öffentlich machen. Die tatsächliche Anzeige im verwendeten WowUp-Client muss anschließend geprüft werden.
+WowUp Hub verwendet das Social-Preview-Bild, ersatzweise den Besitzer-Avatar. Nach öffentlicher Freigabe kann das Bild über die oben genannte GitHub-Einstellung hochgeladen werden. Die tatsächliche Anzeige im WowUp-Client anschließend prüfen.
 
 CurseForge: Beim späteren Anlegen des Projekts `icon-400.png` als Projektavatar wählen. Eine Projekt-ID erst nach Erstellung in der TOC ergänzen.
 
