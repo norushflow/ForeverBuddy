@@ -1,77 +1,37 @@
 # Foreverbuddy 1.1.0
 
-Eigenständige Forever-Variante von AzerothBuddy, Zielclient Interface 16001 wie Foreverbuddyui.
-Dunkle Flächen und neutrale graue Akzente passend zu Foreverbuddyui; keine Abhängigkeit davon.
+<p align="center"><img src="branding/icon-400.png" alt="Foreverbuddy" width="160" height="160"></p>
 
-Enthalten: Charakterübersicht, Dungeon-Transmog, Schaden und Heilung, Aktionsleisten-Vorlagen und Berufspost.
-Tiefen/Valeera und Omnium/Runen sind vollständig aus dem Laufzeitumfang entfernt.
-Eigene Daten: `ForeverbuddyDB` und `ForeverbuddyCharDB`; keine Übernahme der Retail-Daten.
+Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, Aktionsleisten-Vorlagen und den Versand von Berufsmaterialien.
+
+**Client:** WoW Forever · **Interface:** 16001 · **Eigenständig:** keine zusätzlichen Addons erforderlich.
+
+## Funktionen
+
+- Charakterübersicht mit vollständigen Namen und den neun Forever-Klassen.
+- Dungeon-Transmog und eigene Schadens-/Heilungsanzeige.
+- Leistenvorlagen je Klasse einschließlich nativer Klickzauberbelegung.
+- Berufspost mit neun Materialgruppen und getrennten Empfängern für Horde und Allianz.
+
+## Installation
+
+Das Installations-ZIP unter [Releases](https://github.com/norushflow/Foreverbuddy/releases) herunterladen und den enthaltenen Ordner `Foreverbuddy` in `Interface/AddOns/` des passenden Spielclients entpacken. Die Datei `Foreverbuddy.toc` muss direkt in diesem Ordner liegen. Anschließend im Spiel aktivieren und `/reload` ausführen.
+
+Für WowUp die [Repository-Adresse](https://github.com/norushflow/Foreverbuddy) mit Zugriff auf dieses private Repository importieren und den passenden Spielclient wählen.
 
 ## Bedienung
 
-- `/fb` oder `/foreverbuddy`: Zentrale.
+- `/fb` oder `/foreverbuddy`: Zentrale öffnen.
 - `/fb chars`, `/fb transmog`, `/fb meter`, `/fb bars`: Bereiche öffnen.
-- `/fbbars speichern|laden|an|aus|status`: Aktionsleisten-Vorlagen.
-- Minimap-Kompass: Linksklick Zentrale, Rechtsklick Charakterübersicht.
+- `/fbbars speichern|laden|an|aus|status`: Leistenvorlagen verwalten.
+- `/fb mail` oder `/fbmail`: Empfänger der Berufspost einstellen.
+- Minimap-Kompass: Linksklick öffnet die Zentrale, Rechtsklick die Charakterübersicht.
 
-## Installation und Prüfung
+**Berufspost:** Vor- und Nachnamen mit Leerzeichen als Empfänger eintragen. An der Mailbox dockt das Fenster rechts an; erst **Senden** startet den Versand. Weitere Briefe folgen nach Bestätigung, **Stoppen** verhindert weitere Briefe. Gemeinsame Materialien gehen an die zuerst gesendete Gruppe. Gebundene oder gesperrte Gegenstände werden übersprungen; vorhandene Anhänge, Geld oder Nachnahme blockieren den Start. Nach Fehlern verbliebene Anhänge im normalen Briefentwurf prüfen.
 
-`./tools/check.sh` prüft Syntax, TOC und Funktionstests.
-`./tools/package.sh` erstellt ein Installations-ZIP in `dist/`.
-Den Ordner `Foreverbuddy` im Forever-Client unter `Interface/AddOns/` installieren.
-Die Module behalten die vorhandenen API-Prüfungen der Ausgangsversion.
-Die Interface-Kennung allein garantiert keine API-Kompatibilität: Prüfung von Login,
-Charakteren, Transmog, Metern, Leisten, Kampf und Darstellung im Forever-Client steht aus.
-Privates Repository: https://github.com/norushflow/Foreverbuddy
-Ein Versions-Tag passend zur TOC erstellt über GitHub Actions ein WowUp-Release.
+Die Materialgruppen richten sich nach Handelswaren-Unterklassen, nicht nach vollständigen Rezepten. Mehrdeutige Zutaten werden nicht automatisch zugeordnet. Alte Spezialisierungsvorlagen bleiben gespeichert; die gewünschte Belegung einmal als Klassenvorlage sichern. Vorlagen ohne Klickzauberdaten verändern die Klickbelegung nicht.
 
-Die Charakterfilter enthalten nur die neun Forever-Klassen. Veraltete Retail-Klassenfilter
-werden zurückgesetzt; gespeicherte Charakterdaten bleiben erhalten.
+## Änderungen und Entwicklung
 
-Die Leistenvorlage gilt je Klasse, ohne Spezialisierung. „Vorlage speichern“
-sichert die Aktionsleisten und die native Klickzauberbelegung; „Vorlage laden“
-stellt beide wieder her. Bei aktiver Automatik werden auch Änderungen der
-Klickzauber gespeichert. Automatisches Speichern und Laden warten im Kampf.
-Alte Spezialisierungsvorlagen bleiben in den gespeicherten Daten erhalten;
-bitte einmal die gewünschte aktuelle Belegung als neue Vorlage speichern.
-Vorlagen ohne Klickzauberdaten lassen die aktuelle Klickbelegung unverändert.
-
-API-Referenz: [Blizzards Klickzauber-Oberfläche](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_ClickBindingUI/Blizzard_ClickBindingUI.lua).
-Die tatsächlichen API-Berechtigungen und Taintfreiheit müssen im Forever-Client geprüft werden.
-
-### Berufspost
-
-`/fb mail` oder `/fbmail` öffnet die Empfängeroptionen. Beim Öffnen einer
-Mailbox erscheint das Fenster automatisch; erst **Senden** startet die gewählte
-Berufsgruppe. Empfänger werden getrennt für Horde und Allianz gespeichert. Als Empfänger
-Vorname und Nachname mit Leerzeichen eintragen. Alte gemeinsame Empfänger
-werden nicht automatisch zugeordnet; bitte je Fraktion einmal neu eintragen.
-Je Brief werden bis zum Anhanglimit ganze Stapel verschickt. Weitere Briefe
-folgen nach Versandbestätigung. Stoppen verhindert weitere Briefe.
-
-Vorlagen: Alchemie (Kräuter), Inschriftenkunde (Kräuter/Farbstoffe),
-Schmiedekunst (Metall/Stein), Ingenieurskunst (Metall/Stein/Teile),
-Juwelierskunst (Metall/Stein/Juweliersmaterial), Lederverarbeitung (Leder),
-Schneiderei (Stoff), Verzauberkunst (Verzauberungsmaterial), Kochkunst
-(Fleisch/Fisch). Gemeinsame Materialien gehen an die zuerst gesendete Gruppe.
-Die Vorlagen verwenden Handelswaren-Unterklassen, keine vollständigen Rezepte;
-Elementarstoffe und sonstige mehrdeutige Zutaten werden nicht automatisch zugeordnet.
-Gebundene, gesperrte und noch nicht geladene Gegenstände werden übersprungen.
-Vorhandene Anhänge, Geld oder Nachnahme blockieren den Start. Fehler brechen ab;
-verbliebene Anhänge bitte im normalen Briefentwurf prüfen.
-
-Clientprüfung erforderlich: Empfänger speichern, Brief mit einem Stapel,
-mehrere Briefe, voller Empfängerbriefkasten, fehlendes Porto, Abbruch,
-Mailbox schließen und Kampf. Der Forever-Client steht den lokalen Tests nicht zur Verfügung.
-
-Bei geöffneter Mailbox dockt die Berufspost rechts am normalen Mailfenster an
-und folgt dessen Position und Sichtbarkeit. Rahmen, Eingaben und Schaltflächen
-verwenden die klassischen Spieltexturen. Außerhalb der Mailbox bleibt
-`/fb mail` als frei verschiebbares Einstellungsfenster verfügbar.
-
-## Version 1.1.0
-
-- Berufspost mit neun Materialgruppen, Empfängern je Fraktion und Mehrbriefversand.
-- Postfenster angedockt, klassische Spieloptik und aktuelle Gegenstandsschnittstelle.
-- Charakterübersicht mit vollständigem Namen ohne Realm-Spalte.
-- Versand im Forever-Client vom Nutzer erfolgreich getestet.
+Die [Versionshistorie](CHANGELOG.md) enthält ausschließlich Änderungen am Addon.
+Prüfungen, Paketbau und noch offene Spieltests stehen in [Entwicklung und Release](DEVELOPMENT.md).
