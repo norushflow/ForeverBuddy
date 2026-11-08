@@ -43,7 +43,7 @@ function date() return '12:00' end
 function UnitClass() return 'Hunter','HUNTER' end
 function GetClassColor() return 1,1,1 end
 ForeverbuddyDB={clock={hidden=true},schedule={position={}},enabled={clock=true,schedule=true}}
-if arg[1]=='disabled' then ForeverbuddyDB={enabled={characters=false,schedule=false,clock=false,delves=false,omnium=false,transmog=false,meters=false,bars=false}} end
+if arg[1]=='disabled' then ForeverbuddyDB={enabled={characters=false,schedule=false,clock=false,delves=false,omnium=false,transmog=false,meters=false,bars=false,mail=false}} end
 local Buddy={}
 for line in io.lines('Foreverbuddy.toc') do
  if line:match('%.lua$') then assert(loadfile(''..line))('Foreverbuddy',Buddy) end
@@ -67,8 +67,8 @@ assert(not Buddy.Schedule and not Buddy.LoadClock and not Buddy.LoadSchedule)
 assert(not Buddy.db.clock and not Buddy.db.schedule and not Buddy.db.enabled.clock and not Buddy.db.enabled.schedule)
 assert(not SlashCmdList.MIDNIGHTEVENTFEED and not ForeverbuddyClockFrame and not ForeverbuddySchedulePanel)
 for _,f in ipairs(frames) do assert(not f.events.EVENT_SCHEDULER_UPDATE) end
-local expected={characters=true,transmog=true,meters=true,bars=true}
-assert(#Buddy.modules==4)
+local expected={characters=true,transmog=true,meters=true,bars=true,mail=true}
+assert(#Buddy.modules==5)
 for _,m in ipairs(Buddy.modules) do assert(expected[m.key] and type(Buddy[m.loader])=='function');expected[m.key]=nil end
 assert(next(expected)==nil)
 local originalOpen=Buddy.OpenModule
@@ -106,7 +106,8 @@ for _,button in ipairs(characters.classButtons) do
 end
 assert(next(foreverClasses)==nil)
 assert(characters:IsShown() and characters.height==420,'compact character view')
-assert(characters.rows[1].cells[3].text=='Jäger','localized class label')
+assert(characters.rows[1].cells[2].text=='Jäger','localized class label')
+assert(characters.rows[1].cells[1].text=='Buddy Realm','full name must include secondary name')
 for i=1,20 do Buddy.db.characters.chars['alt'..i]={name='Alt'..i,realm='Realm',class='MAGE',level=i,playtime_sec=i*60} end
 characters.Render();assert(characters.height==630,'row cap at twelve')
 characters.scroll.offset=9
@@ -115,9 +116,9 @@ characters.Render();assert(characters.scroll.offset==0 and characters.rows[1]:Is
 Buddy.db.characters.filters.class='WARRIOR'
 characters.Render();assert(characters.empty:IsShown(),'empty filter state')
 characters.clearBtn.scripts.OnClick();assert(not characters.empty:IsShown())
-characters.headers[7].scripts.OnClick();assert(Buddy.db.characters.sort.key=='level' and Buddy.db.characters.sort.asc)
+characters.headers[6].scripts.OnClick();assert(Buddy.db.characters.sort.key=='level' and Buddy.db.characters.sort.asc)
 characters.tab2.scripts.OnClick();assert(characters.headers[1].text.text=='Klasse' and characters.rows[1].cells[1].text=='Magier')
-characters.tab1.scripts.OnClick();assert(characters.headers[1].text.text=='Realm' and characters.scroll.offset==0)
+characters.tab1.scripts.OnClick();assert(characters.headers[1].text.text=='Vor- und Nachname' and characters.scroll.offset==0)
 print('PASS: character layout, localization, row cap, filtering, empty state, sorting and tabs')
 -- Berufssnapshot: fehlende Login-/Logoutdaten dürfen gespeicherte Berufe nicht löschen.
 local charEvents
@@ -166,8 +167,8 @@ if not characters:IsShown() then SlashCmdList.FOREVERBUDDYCHARS() end
 characters.Render()
 local found=false
 for _,row in ipairs(characters.rows) do
- if row:IsShown() and row.cells[2].text=='Offline' then
-  assert(row.cells[9].text=='~15.0%','one day must add estimated rest from zero')
+ if row:IsShown() and row.cells[1].text=='Offline Realm' then
+  assert(row.cells[8].text=='~15.0%','one day must add estimated rest from zero')
   found=true
  end
 end

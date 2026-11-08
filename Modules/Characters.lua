@@ -72,6 +72,16 @@ local m = math.floor(rem / 60)
 return string.format("%dd %dh %dm", d, h, m)
 end
 
+-- Forever returns the secondary name in the second UnitFullName value.
+-- Keep existing snapshot keys/fields so stored professions and playtime survive.
+local function FullName(c)
+local first = c.name or ""
+local last = c.realm or ""
+if last == "" or last == "?" or last == "UnknownRealm" then return first end
+return first .. " " .. last
+end
+if AltMiniDB.sort.key == "realm" then AltMiniDB.sort.key = "name" end
+
 -- ---------------- Stable character key ----------------
 local CURRENT_KEY
 
@@ -268,8 +278,7 @@ end
 local ui
 
 local COLS = {
-{ key="realm",        title="Realm",     w=130 },
-{ key="name",         title="Name",      w=120 },
+{ key="name",         title="Vor- und Nachname", w=250 },
 { key="class",        title="Klasse",    w=110 },
 { key="faction",      title="Fraktion",  w=90  },
 { key="prof1",        title="Beruf 1",   w=180 },
@@ -281,6 +290,7 @@ local COLS = {
 }
 
 local function GetCellValueForSort(c, key)
+if key == "name" then return FullName(c) end
 if key == "prof1" then return FormatProf(c.prof1_name, c.prof1_lvl) end
 if key == "prof2" then return FormatProf(c.prof2_name, c.prof2_lvl) end
 return c[key]
@@ -734,7 +744,9 @@ local cell = row.cells[colIdx]
 local key = col.key
 local v
 
-if key == "prof1" then
+if key == "name" then
+v = FullName(c)
+elseif key == "prof1" then
 v = FormatProf(p1_name, p1_lvl)
 elseif key == "prof2" then
 v = FormatProf(p2_name, p2_lvl)

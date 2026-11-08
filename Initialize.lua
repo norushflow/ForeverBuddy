@@ -25,7 +25,7 @@ events:SetScript("OnEvent",function(_,event,name)
         SLASH_FOREVERBUDDY1="/fb"; SLASH_FOREVERBUDDY2="/foreverbuddy"
         SlashCmdList.FOREVERBUDDY=function(input)
             local command=(input or ""):match("^%s*(.-)%s*$"):lower()
-            local aliases={chars=1,charaktere=1,transmog=2,meter=3,schadensmeter=3,bars=4,leisten=4,aktionsleisten=4}
+            local aliases={mail=5,post=5,chars=1,charaktere=1,transmog=2,meter=3,schadensmeter=3,bars=4,leisten=4,aktionsleisten=4}
             if aliases[command] then
                 local module=Buddy.modules[aliases[command]]
                 if module and module.key=="bars" then Buddy.Toggle()

@@ -4,6 +4,7 @@ Buddy.modules = {
     {key="transmog", name="Dungeon-Transmog", loader="LoadTransmog", command="FOREVERBUDDYTRANSMOG"},
     {key="meters", name="Schaden und Heilung", loader="LoadMeters", command="FOREVERBUDDYMETERS"},
     {key="bars", name="Aktionsleisten", loader="LoadBars", command="FOREVERBUDDYBARS", argument="status"},
+    {key="mail", name="Berufspost", loader="LoadMail", command="FOREVERBUDDYMAIL"},
 }
 function Buddy.Foreign(frame, action)
     if (issecretvalue and issecretvalue(frame)) or not frame then return false end
