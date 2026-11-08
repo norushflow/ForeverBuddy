@@ -60,4 +60,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" "dist/$ADDON-$ADDON_VERSION$ZIP_SUFFIX.zip" \
-            --verify-tag --title "$ADDON $ADDON_VERSION" --notes-file /tmp/addon-release-notes.md
+            --verify-tag --title "ForeverBuddy $ADDON_VERSION" --notes-file /tmp/addon-release-notes.md

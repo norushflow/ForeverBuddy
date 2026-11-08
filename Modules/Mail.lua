@@ -84,7 +84,7 @@ function Buddy.LoadMail()
         if n==0 then stop("Versand abgeschlossen. Keine weiteren passenden, versendbaren Materialien gefunden."); return end
         if GetMoney() < n*30 then stop("Nicht genügend Gold für das Porto. Anhänge bleiben im Entwurf."); return end
         pending,timeout=true,0
-        SendMail(active.recipient,"Materialien: "..active.group[2],"Gesendet mit Foreverbuddy")
+        SendMail(active.recipient,"Materialien: "..active.group[2],"Gesendet mit ForeverBuddy")
     end
     function M.Start(group)
         if active then note("Versand läuft bereits."); return end

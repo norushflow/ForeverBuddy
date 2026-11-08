@@ -17,7 +17,7 @@ end
 function Buddy.HideTooltip()
     Buddy.Foreign(GameTooltip, function(tooltip) tooltip:Hide() end)
 end
-function Buddy.Message(text) print("|cffd0d0d0Foreverbuddy:|r " .. text) end
+function Buddy.Message(text) print("|cffd0d0d0ForeverBuddy:|r " .. text) end
 function Buddy.OpenModule(module)
     if not Buddy.loaded[module.key] then Buddy.Message("Modul aktivieren und die Oberfläche neu laden."); return end
     if module.key == "bars" then
@@ -49,7 +49,7 @@ function Buddy.Toggle()
         icon:SetTexture("Interface\\AddOns\\Foreverbuddy\\Media\\BuddyIcon")
         icon:SetSize(42,42); icon:SetPoint("TOPLEFT",16,-15)
         local title = panel:CreateFontString(nil,"OVERLAY","GameFontNormalLarge")
-        title:SetPoint("TOPLEFT",68,-21); title:SetText("Foreverbuddy")
+        title:SetPoint("TOPLEFT",68,-21); title:SetText("ForeverBuddy")
         local sub = panel:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall")
         sub:SetPoint("TOPLEFT",68,-44); sub:SetText("Dein Begleiter in Forever")
         local close = CreateFrame("Button",nil,panel,"UIPanelCloseButton")
@@ -133,7 +133,7 @@ function Buddy.CreateMinimap()
     button:SetScript("OnEnter",function(self)
         Buddy.Foreign(GameTooltip, function()
         GameTooltip:SetOwner(self,"ANCHOR_LEFT")
-        GameTooltip:AddLine("Foreverbuddy",.78,.78,.78)
+        GameTooltip:AddLine("ForeverBuddy",.78,.78,.78)
         GameTooltip:AddLine("Linksklick: Zentrale",1,1,1)
         GameTooltip:AddLine("Rechtsklick: Charaktere",1,1,1)
         GameTooltip:AddLine("Ziehen: Position ändern",.7,.7,.7)

@@ -292,7 +292,7 @@ function T.Toggle()
         p:SetClampedToScreen(true);p:SetMovable(true);p:EnableMouse(true);p:RegisterForDrag("LeftButton")
         p:SetScript("OnDragStart",p.StartMoving);p:SetScript("OnDragStop",p.StopMovingOrSizing)
         Buddy.Style.Window(p)
-        label(p,"|cffd0d0d0Foreverbuddy · Dungeon-Transmog|r",20,-18,600)
+        label(p,"|cffd0d0d0ForeverBuddy · Dungeon-Transmog|r",20,-18,600)
         T.heading=label(p,"",20,-48,600);T.summary=label(p,"",20,-74,600)
         label(p,"Accountweite Vorlagen · aktuelle Schwierigkeit · Klassen laut Journal\nMehrfachbeute zählt einmal. * Tokens/offene Zuordnungen zählen nicht zur Prozentzahl.",20,-118,610)
         T.rows={}

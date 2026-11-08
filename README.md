@@ -1,6 +1,6 @@
-# Foreverbuddy 1.1.1
+# ForeverBuddy 1.1.2
 
-<p align="center"><img src="branding/icon-400.png" alt="Foreverbuddy" width="160" height="160"></p>
+<p align="center"><img src="branding/icon-400.png" alt="ForeverBuddy" width="160" height="160"></p>
 
 Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, Aktionsleisten-Vorlagen und den Versand von Berufsmaterialien.
 
@@ -15,9 +15,9 @@ Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, A
 
 ## Installation
 
-Das Installations-ZIP unter [Releases](https://github.com/norushflow/Foreverbuddy/releases) herunterladen und den enthaltenen Ordner `Foreverbuddy` in `Interface/AddOns/` des passenden Spielclients entpacken. Die Datei `Foreverbuddy.toc` muss direkt in diesem Ordner liegen. Anschließend im Spiel aktivieren und `/reload` ausführen.
+Das Installations-ZIP unter [Releases](https://github.com/norushflow/ForeverBuddy/releases) herunterladen und den enthaltenen Ordner `Foreverbuddy` in `Interface/AddOns/` des passenden Spielclients entpacken. Die Datei `Foreverbuddy.toc` muss direkt in diesem Ordner liegen. Anschließend im Spiel aktivieren und `/reload` ausführen.
 
-Für WowUp die [Repository-Adresse](https://github.com/norushflow/Foreverbuddy) importieren und den passenden Spielclient wählen.
+Für WowUp die [Repository-Adresse](https://github.com/norushflow/ForeverBuddy) importieren und den passenden Spielclient wählen.
 
 ## Bedienung
 

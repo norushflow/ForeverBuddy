@@ -1,8 +1,8 @@
 ## Interface: 16001
-## Title: Foreverbuddy
+## Title: ForeverBuddy
 ## Notes: Charaktere, Transmog, Schadensanzeige, Aktionsleisten und Berufspost für Forever.
 ## Author: norushflow
-## Version: 1.1.1
+## Version: 1.1.2
 ## IconTexture: Interface\AddOns\Foreverbuddy\Media\BuddyIcon
 ## SavedVariables: ForeverbuddyDB
 ## SavedVariablesPerCharacter: ForeverbuddyCharDB

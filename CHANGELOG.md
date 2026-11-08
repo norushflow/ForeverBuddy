@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2
+
+- Anzeigenamen in der Addonübersicht und den Fenstern auf **ForeverBuddy** vereinheitlicht.
+
 ## 1.1.1
 
 - Autorenangabe in der Addonübersicht auf **norushflow** geändert.
