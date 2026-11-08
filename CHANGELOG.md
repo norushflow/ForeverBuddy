@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- Autorenangabe in der Addonübersicht auf **norushflow** geändert.
+
 ## 1.1.0
 
 - Berufspost mit neun Materialgruppen, Empfängern je Fraktion und Versand mehrerer Briefe hinzugefügt.
