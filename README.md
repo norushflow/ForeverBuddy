@@ -1,4 +1,4 @@
-# ForeverBuddy 1.1.5
+# ForeverBuddy 1.1.6
 
 <p align="center"><img src="branding/icon-400.png" alt="ForeverBuddy" width="160" height="160"></p>
 
@@ -33,7 +33,9 @@ Für WowUp die [Repository-Adresse](https://github.com/norushflow/ForeverBuddy) 
 - `/fb mail` oder `/fbmail`: Empfänger der Berufspost einstellen.
 - Minimap-Kompass: Linksklick öffnet die Zentrale, Rechtsklick die Charakterübersicht.
 
-**Aktionsleisten:** Die automatische Sicherung unter `ForeverbuddyCharDB.actions` funktioniert auch ohne Rollenzuordnung und unter Stufe 10. Mit **Vorlage nach Rolle speichern** legst du die aktuellen Leisten und Klickzauber für die von Blizzard zugewiesene Rolle ab. Aktiviere **Synchronisierung nach Rolle**, damit ein Rollenwechsel die passende Vorlage deiner Klasse lädt. Fehlt sie, bleibt die Belegung bestehen. Die bisherigen Klassenvorlagen sind weiterhin über **Vorlage laden** erreichbar.
+**Aktionsleisten.** Wähle im Vorlagenbereich **Tank**, **Heiler** oder **Schaden**. ForeverBuddy merkt sich die Auswahl je Charakter. Mit **Vorlage speichern** sicherst du die Aktionsleisten 1–10, die nativen Blizzard-Klickzauber und die verwendeten Charaktermakros für diese Klasse und Rolle. **Vorlage laden** übernimmt die passende Vorlage nach Bestätigung. Auch das Überschreiben einer gespeicherten Vorlage erfordert eine Bestätigung. Die Auswahl und beide Schaltflächen stehen auch unter Stufe 10 zur Verfügung.
+
+Die automatische Sicherung bleibt unter `ForeverbuddyCharDB.actions` erhalten. Gemeinsame Rollenvorlagen liegen in `ForeverbuddyDB.bars.library`. Ältere Klassenvorlagen sind weiterhin über `/fbbars laden` erreichbar. Beim Laden einer Rollenvorlage bleiben allgemeine Makros erhalten. Fehlende Charaktermakros werden bei verfügbarer Client-API angelegt. Bei einem gleichnamigen Charaktermakro mit anderem Inhalt bleibt die aktuelle Belegung erhalten.
 
 **Berufspost:** Vor- und Nachnamen mit Leerzeichen als Empfänger eintragen. An der Mailbox dockt das Fenster rechts an; erst **Senden** startet den Versand. Weitere Briefe folgen nach Bestätigung, **Stoppen** verhindert weitere Briefe. Gemeinsame Materialien gehen an die zuerst gesendete Gruppe. Gebundene oder gesperrte Gegenstände werden übersprungen; vorhandene Anhänge, Geld oder Nachnahme blockieren den Start. Nach Fehlern verbliebene Anhänge im normalen Briefentwurf prüfen.
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.6
+
+- Manuelle Rollenauswahl je Charakter für Aktionsleisten-Vorlagen. Die bisherige automatische Rollensynchronisierung entfällt.
+- Laden und Überschreiben von Vorlagen benötigen eine Bestätigung.
+- Gemeinsame Rollenvorlagen sichern verwendete Charaktermakros aus Aktionsleisten und nativen Klickzaubern mit ihrem Inhalt.
+
 ## 1.1.5
 
 - Aktionsleisten 1–10 und native Klickzauber werden je Charakter und Klasse gesichert, auch unter Stufe 10 und ohne Spezialisierung oder Rolle.

@@ -103,7 +103,20 @@ local function macroName(index)
     if ok and B.Text(name) then return name end
 end
 
-function B.Read(slot)
+local function macroEntry(index,includeBody)
+    local name=macroName(index)
+    if not name then return end
+    local entry={action="macro",value=name}
+    if includeBody then
+        local _,icon,body=B.Call(GetMacroInfo,index)
+        if type(body)~="string" or not (B.Number(icon) or B.Text(icon)) then return end
+        entry.macroBody=body
+        entry.macroIcon=icon
+    end
+    return entry
+end
+
+function B.Read(slot,includeMacroBody)
     if type(GetActionInfo)~="function" then return nil,L["API fehlt"] end
     local ok,kind,id=pcall(GetActionInfo,slot)
     if not ok then return nil,L["Abfrage fehlgeschlagen"] end
@@ -119,8 +132,8 @@ function B.Read(slot)
         -- kein Wiederherstellen und keine Meldung als fehlendes Makro.
         if scope=="account" then return {action="ignored"} end
         if scope~="character" then return nil,L["Makro nicht gefunden"] end
-        local name=macroName(id)
-        if B.Text(name) then return {action="macro",value=name} end
+        local entry=macroEntry(id,includeMacroBody)
+        if entry then return entry end
         return nil,L["Makro nicht gefunden"]
     elseif kind=="equipmentset" then
         local name
@@ -159,6 +172,23 @@ function B.MacroLookup(name)
     return nil,"missing"
 end
 
+local function resolveMacro(entry,allowCreate)
+    local index,scope=B.MacroLookup(entry.value)
+    if entry.macroBody==nil then return index,scope end
+    if not B.Text(entry.value) or not B.Public(entry.macroBody) or type(entry.macroBody)~="string"
+        or not (B.Number(entry.macroIcon) or B.Text(entry.macroIcon)) then return end
+    if index then
+        local _,_,body=B.Call(GetMacroInfo,index)
+        if body==entry.macroBody then return index end
+        return nil,"conflict"
+    end
+    if allowCreate and (scope=="missing" or scope=="account") and not B.Reason() then
+        local created=B.Call(CreateMacro,entry.value,entry.macroIcon,entry.macroBody,true)
+        if B.MacroScope(created)=="character" then return created end
+    end
+    return nil,scope
+end
+
 local function flyoutIndex(id)
     local api=C_SpellBook
     local bank=Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player
@@ -190,7 +220,7 @@ function B.Pick(entry)
     elseif kind=="item" and B.Number(value) and C_Item and type(C_Item.PickupItem)=="function" then
         pcall(C_Item.PickupItem,value)
     elseif kind=="macro" and B.Text(value) then
-        local index,scope=B.MacroLookup(value)
+        local index,scope=resolveMacro(entry,true)
         if not index then return false,scope end
         if type(PickupMacro)~="function" then return false,"api" end
         pcall(PickupMacro,index)
@@ -225,15 +255,83 @@ function B.CopyClickBindings(info)
     if count~=#result then return end
     return result
 end
-function B.ReadClickBindings()
-    return B.CopyClickBindings(B.Call(C_ClickBindings and C_ClickBindings.GetProfileInfo))
+local function isClickMacro(binding)
+    return Enum and Enum.ClickBindingType and binding.type==Enum.ClickBindingType.Macro
 end
-function B.ApplyClickBindings(profile)
+
+function B.ReadClickBindings(shared)
+    local info=B.CopyClickBindings(B.Call(C_ClickBindings and C_ClickBindings.GetProfileInfo))
+    if not info or not shared then return info end
+    local result={}
+    for _,binding in ipairs(info) do
+        if isClickMacro(binding) then
+            local scope=B.MacroScope(binding.actionID)
+            if scope=="character" then
+                binding.macro=macroEntry(binding.actionID,true)
+                if not binding.macro then return end
+                binding.actionID=0 -- Makroindizes sind nur auf dem Quellcharakter gültig.
+            elseif scope~="account" then return end
+            if binding.macro then result[#result+1]=binding end
+        else
+            result[#result+1]=binding
+        end
+    end
+    return result
+end
+
+local function sharedClickBindings(profile,info)
+    local current=B.ReadClickBindings()
+    if not current then return end
+    local result,protected,previous={},{},{}
+    local function chord(binding)
+        return binding.button..":"..binding.modifiers
+    end
+    for _,binding in ipairs(current) do
+        local key=chord(binding)
+        previous[key]=binding
+        if isClickMacro(binding) and B.MacroScope(binding.actionID)~="character" then
+            protected[key]=true
+            result[#result+1]=binding
+        end
+    end
+    -- Neue Makros können die laufenden Makroindizes verändern. Erst anlegen,
+    -- dann alle Klickbelegungen mit ihren endgültigen Indizes aufbauen.
+    for index,binding in ipairs(info) do
+        local macro=profile.clickBindings[index].macro
+        if isClickMacro(binding) and not protected[chord(binding)] and B.Table(macro) then
+            resolveMacro(macro,true)
+        end
+    end
+    current=B.ReadClickBindings()
+    if not current then return end
+    for _,binding in ipairs(current) do previous[chord(binding)]=binding end
+    local complete=true
+    for index,binding in ipairs(info) do
+        local key=chord(binding)
+        if not protected[key] then
+            if isClickMacro(binding) then
+                local macro=profile.clickBindings[index].macro
+                binding.actionID=B.Table(macro) and resolveMacro(macro,false) or nil
+                if not binding.actionID then
+                    complete=false
+                    if previous[key] then result[#result+1]=previous[key] end
+                end
+            end
+            if binding.actionID then result[#result+1]=binding end
+        end
+    end
+    return result,complete
+end
+
+function B.ApplyClickBindings(profile,shared)
     -- Alte Vorlagen ohne Klickzauber verändern die aktuelle Belegung nicht.
     if profile.clickBindings==nil then return true end
     local info=B.CopyClickBindings(profile.clickBindings)
     if not info then return false end
     if not C_ClickBindings or type(C_ClickBindings.SetProfileByInfo)~="function" then return false end
     if B.Reason() then return false end
-    return pcall(C_ClickBindings.SetProfileByInfo,info)
+    local complete=true
+    if shared then info,complete=sharedClickBindings(profile,info) end
+    if not info or B.Reason() then return false end
+    return pcall(C_ClickBindings.SetProfileByInfo,info) and complete
 end

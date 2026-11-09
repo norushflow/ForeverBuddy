@@ -17,6 +17,7 @@ local function drain()
 end
 
 local methods={}
+function methods:SetChecked(value) self.checked=value end
 function methods:SetScript(k,v) self.scripts[k]=v end
 function methods:GetScript(k) return self.scripts[k] end
 function methods:RegisterEvent(k) self.events[k]=true end
@@ -46,6 +47,17 @@ end
 function CreateFrame() return object() end
 UIParent=object();UISpecialFrames={};SlashCmdList={}
 
+local popup
+StaticPopupDialogs={}
+function StaticPopup_Show(key,prompt,_,data)
+    popup={key=key,prompt=prompt,data=data}
+end
+local function answerPopup(accept)
+    local current=assert(popup,'confirmation is open')
+    popup=nil
+    if accept then StaticPopupDialogs[current.key].OnAccept(nil,current.data) end
+end
+
 local function fire(event,arg)
     for _,frame in ipairs(frames) do
         if frame.events[event] and frame.scripts.OnEvent then
@@ -55,9 +67,9 @@ local function fire(event,arg)
 end
 
 -- Forever hat keine Spezialisierungs-API.
-local class,role="HUNTER","NONE"
+local class="HUNTER"
 function UnitClass() return class=="HUNTER" and "Jäger" or class,class end
-function UnitGroupRolesAssigned() return role end
+function UnitGroupRolesAssigned() error("role must be selected manually") end
 function UnitLevel() return 5 end
 function UnitGUID() return "Player-1-ABC" end
 function UnitFullName() return "Buddy","Realm" end
@@ -116,8 +128,17 @@ C_Spell={PickupSpell=function(id)
 end}
 C_Item={PickupItem=function(id) cursor={action="item",value=id} end}
 local macroNames={[1]="Raid",[19]="Extra",[20]="Heal"}
-function GetNumMacros() return 1,2 end
-function GetMacroInfo(index) return macroNames[index] end
+local macroBodies={[19]="/cast Test", [20]="/cast Heal"}
+local characterMacros=2
+function GetNumMacros() return 1,characterMacros end
+function GetMacroInfo(index) return macroNames[index],134400,macroBodies[index] end
+function CreateMacro(name,icon,body,perCharacter)
+    assert(perCharacter and not combat and icon==134400)
+    characterMacros=characterMacros+1
+    local index=MAX_ACCOUNT_MACROS+characterMacros
+    macroNames[index],macroBodies[index]=name,body
+    return index
+end
 function PickupMacro(index)
     local name=macroNames[index]
     if name then cursor={action="macro",index=index,value=name} end
@@ -134,7 +155,7 @@ C_EquipmentSet={
         if name then cursor={action="equipmentset",value=name} end
     end,
 }
-Enum={SpellBookSpellBank={Player=0,Pet=1},SpellBookItemType={Spell=1,Flyout=4}}
+Enum={ClickBindingType={Macro=2},SpellBookSpellBank={Player=0,Pet=1},SpellBookItemType={Spell=1,Flyout=4}}
 C_SpellBook={
     IsSpellKnownOrInSpellBook=function(id) return known[id]==true end,
     GetNumSpellBookSkillLines=function() return 1 end,
@@ -173,7 +194,6 @@ local backup=Buddy.char.actions.HUNTER
 assert(backup and backup.actions[120].action=='empty' and backup.clickBindings[1].actionID==133,
     'login backs up bars and clicks at level 5 without specialization or role')
 assert(Buddy.char.actions.PALADIN.actions[1].value==1943,'login preserves other classes')
-assert(not B.SaveRole(),'saving a role template requires an assigned role')
 
 -- Ausgangsbelegung speichern. Platz 4 ist ein Charaktermakro, Platz 13 ein
 -- accountweites Makro, das vollständig ignoriert werden muss.
@@ -366,13 +386,13 @@ local menuHeight=B.BuildMenu(object(),-100)
 assert(menuHeight==B.MENU_HEIGHT and B.menuStatus.text:find('Automatik AN')
     and B.menuStatus.text:find('Jäger'),'inline menu shows state and specialization')
 assert(B.menuNote.text==B.note,'inline menu shows the last note')
-local saveButton,loadButton,roleSaveButton
+local saveButton,loadButton
 for _,frame in ipairs(frames) do
     if frame.text=='Vorlage speichern' then saveButton=frame end
     if frame.text=='Vorlage laden' then loadButton=frame end
-    if frame.text=='Vorlage nach Rolle speichern' then roleSaveButton=frame end
 end
-assert(saveButton and loadButton and roleSaveButton and B.syncCheckbox,'all inline controls exist')
+assert(saveButton and loadButton and B.roleCheckboxes.TANK and B.roleCheckboxes.HEALER
+    and B.roleCheckboxes.DAMAGER,'all inline controls exist')
 -- Kommandos
 messages={}
 SlashCmdList.FOREVERBUDDYBARS('status')
@@ -467,10 +487,15 @@ assert(B.events.events.PLAYER_LOGOUT and not B.events.events.PLAYER_SPECIALIZATI
 
 print('PASS: bar profiles, automatic save/load, click bindings, guards, secrets and inline menu')
 
--- Vorlagen werden je Klasse und Rolle gespeichert und nur bei einem Rollenwechsel geladen.
-local function changeRole(value)
-    role=value
-    fire('PLAYER_ROLES_ASSIGNED');drain()
+-- Manuelle Auswahl und gemeinsame Vorlagen funktionieren bereits auf Stufe 5.
+local function clickRole(role)
+    local check=B.roleCheckboxes[role]
+    check.checked=not check.checked -- UICheckButtonTemplate schaltet vor OnClick um.
+    check:GetScript('OnClick')(check)
+    assert(Buddy.char.barRole==role and B.Role()==role)
+    for key,button in pairs(B.roleCheckboxes) do
+        assert(button.checked==(key==role),'exactly one role is checked')
+    end
 end
 local function setLayout(value)
     bar[120]={action='spell',value=value}
@@ -480,49 +505,84 @@ end
 local function expectLayout(value)
     assert(bar[120].value==value and clicks[1].actionID==value,'bars and native clicks match')
 end
+local saveRole=saveButton:GetScript('OnClick')
+local loadRole=loadButton:GetScript('OnClick')
+assert(not saveRole() and not loadRole() and not popup and B.note:find('Rolle auswählen'))
 for _,entry in ipairs({{'TANK',100},{'HEALER',133},{'DAMAGER',1943}}) do
-    changeRole(entry[1]);setLayout(entry[2])
-    assert(roleSaveButton:GetScript('OnClick')(),'role template saved through the menu')
+    clickRole(entry[1]);setLayout(entry[2])
+    assert(saveRole() and not popup,('new role template is saved immediately: '..tostring(B.note)))
 end
 local hunter=Buddy.db.bars.library.HUNTER
 assert(hunter.default==saved,'legacy class template remains independently available')
-class='PALADIN'
-changeRole('TANK');setLayout(133)
-assert(B.SaveRole())
-local paladin=Buddy.db.bars.library.PALADIN
-assert(paladin.TANK.actions[120].value==133 and hunter.TANK.actions[120].value==100,
-    'a second class saves the same role independently')
-assert(Buddy.char.actions.PALADIN.actions[120].value==133 and backup.actions[120].value==1943)
-B.SetRoleSync(true)
-changeRole('HEALER')
-expectLayout(133)
-assert(not paladin.HEALER,'missing class template leaves layout unchanged')
-class='HUNTER'
-changeRole('TANK');expectLayout(100)
-changeRole('HEALER');expectLayout(133)
-changeRole('DAMAGER');expectLayout(1943)
-assert(backup.actions[120].value==1943 and backup.clickBindings[1].actionID==1943)
+clickRole('DAMAGER')
 setLayout(100)
-assert(hunter.DAMAGER.actions[120].value==1943 and hunter.DAMAGER.clickBindings[1].actionID==1943,
-    'autosave does not alter a role template')
-changeRole('DAMAGER');expectLayout(100)
+saveRole()
+assert(popup.prompt:find('Schaden') and hunter.DAMAGER.actions[120].value==1943)
+answerPopup(false)
+assert(hunter.DAMAGER.actions[120].value==1943,'cancelled overwrite keeps template')
+saveRole();answerPopup(true)
+assert(hunter.DAMAGER.actions[120].value==100,'confirmed overwrite saves layout')
+local beforeDamage=hunter.DAMAGER
 local readRoleClicks=C_ClickBindings.GetProfileInfo
 C_ClickBindings.GetProfileInfo=function() error('temporarily unavailable') end
-local oldDamage=hunter.DAMAGER
-assert(not B.SaveRole() and hunter.DAMAGER==oldDamage,'unreadable click bindings preserve the whole role template')
+saveRole();answerPopup(true)
+assert(hunter.DAMAGER==beforeDamage,'unreadable click bindings preserve the whole role template')
 C_ClickBindings.GetProfileInfo=readRoleClicks
+
+class='PALADIN'
+clickRole('TANK');setLayout(133)
+assert(not loadRole() and not popup and B.note:find('Keine Vorlage für diese Rolle'))
+assert(saveRole())
+assert(Buddy.db.bars.library.PALADIN.TANK.actions[120].value==133
+    and hunter.TANK.actions[120].value==100,'the same role is independent across classes')
+assert(Buddy.char.actions.PALADIN.actions[120].value==133)
+class='HUNTER'
+Buddy.db.bars.roleSync=true -- Einstellung aus älterer Version.
+clickRole('HEALER')
+fire('PLAYER_ROLES_ASSIGNED');drain()
+assert(not B.events.events.PLAYER_ROLES_ASSIGNED)
+setLayout(1943)
+clickRole('TANK');expectLayout(1943)
+clickRole('HEALER');expectLayout(1943)
+loadRole();expectLayout(1943)
+answerPopup(false);expectLayout(1943)
+loadRole();clickRole('TANK');answerPopup(true);expectLayout(1943)
+clickRole('HEALER')
 combat=true
-changeRole('HEALER');expectLayout(100)
-assert(B.pending,'role change waits during combat')
-B.SetRoleSync(false)
+loadRole();answerPopup(true);expectLayout(1943)
+assert(B.pending)
 combat=false
 fire('PLAYER_REGEN_ENABLED');drain()
-expectLayout(100)
-changeRole('DAMAGER');expectLayout(100)
-B.SetRoleSync(true)
-changeRole('HEALER');expectLayout(133)
-changeRole('NONE');expectLayout(133)
-setLayout(1943)
-assert(backup.actions[120].value==1943,'autosave continues without assigned role')
+expectLayout(133)
+assert(not B.pending and backup.actions[120].value==133)
 
-print('PASS: level 5, class and role isolation, optional role sync, native clicks and legacy templates')
+-- Gleiche Klasse, anderer Charakter: Rollenwahl bleibt lokal, Vorlage ist gemeinsam.
+bar[4]={action='macro',value='Extra'}
+bar[5]={action='macro',value='Raid'}
+clicks={
+    {type=2,actionID=19,button='LeftButton',modifiers=0},
+    {type=2,actionID=1,button='MiddleButton',modifiers=0},
+}
+saveRole();answerPopup(true)
+assert(hunter.HEALER.actions[4].macroBody=="/cast Test")
+assert(hunter.HEALER.actions[5]==nil and #hunter.HEALER.clickBindings==1
+    and hunter.HEALER.clickBindings[1].actionID==0)
+local originalChar=Buddy.char
+Buddy.char={actions={}}
+B.RefreshMenu()
+assert(not B.Role() and not B.roleCheckboxes.HEALER.checked)
+clickRole('HEALER')
+macroNames[19],macroBodies[19]='Other','/cast Other'
+bar[4]=nil
+clicks={{type=2,actionID=1,button='MiddleButton',modifiers=0}}
+loadRole();answerPopup(true);drain()
+assert(bar[4].value=='Extra' and macroBodies[21]=='/cast Test' and characterMacros==3)
+assert(clicks[1].actionID==1 and clicks[2].actionID==21,'click macros use the destination macro index')
+loadRole();answerPopup(true)
+assert(characterMacros==3,'loading again reuses the restored macro')
+clickRole('DAMAGER')
+Buddy.char=originalChar
+B.RefreshMenu()
+assert(B.Role()=='HEALER' and B.roleCheckboxes.HEALER.checked,'original character retains its selection')
+
+print('PASS: manual roles at level 5, confirmations, class and character isolation, native clicks and macros')

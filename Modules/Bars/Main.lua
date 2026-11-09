@@ -5,9 +5,11 @@ local B=Buddy.Bars
 local flushQueued,initialBackupQueued,retryQueued=false,false,false
 local roleLabels={TANK="Tank",HEALER="Heiler",DAMAGER="Schaden"}
 
+local roles={"TANK","HEALER","DAMAGER"}
+
 function B.Role()
-    local role=B.Call(UnitGroupRolesAssigned,"player")
-    return roleLabels[role] and role or nil
+    local role=Buddy.char.barRole
+    return B.Text(role) and roleLabels[role] and role or nil
 end
 
 function Buddy.LoadBars()
@@ -26,9 +28,6 @@ function Buddy.LoadBars()
     end
     function B.SetNote(text)
         B.note=text
-        if B.RefreshMenu then B.RefreshMenu() end
-    end
-    function B.Update()
         if B.RefreshMenu then B.RefreshMenu() end
     end
     function B.RowText()
@@ -60,7 +59,7 @@ function Buddy.LoadBars()
             for slot,entry in pairs(previous.actions) do actions[slot]=entry end
         end
         for _,slot in ipairs(B.slots) do
-            local entry,slotReason=B.Read(slot)
+            local entry,slotReason=B.Read(slot,role~=nil)
             if not entry then
                 unreadable[#unreadable+1]=slot..(slotReason and (" · "..slotReason) or "")
             elseif entry.action=="ignored" then
@@ -85,7 +84,7 @@ function Buddy.LoadBars()
         if ignored>0 then
             notes[#notes+1]=ignored..(ignored==1 and L[" allgemeines Makro ignoriert"] or L[" allgemeine Makros ignoriert"])
         end
-        local clicks=B.ReadClickBindings()
+        local clicks=B.ReadClickBindings(role~=nil)
         if not clicks and role then
             B.SetNote(L["Klickzauber konnten nicht gespeichert werden"])
             if announce then Buddy.Message(B.note) end
@@ -134,13 +133,6 @@ function Buddy.LoadBars()
         B.dirty=not readable or (C_ClickBindings and not clicks) or false
     end
 
-    function B.SaveRole()
-        local role=B.Role()
-        if role then return B.Save(true,role) end
-        B.SetNote(L["Keine Rolle zugewiesen"])
-        return false
-    end
-
     function B.Apply(announce,role)
         B.pending=nil
         local profile,class=B.Profile(role)
@@ -150,7 +142,7 @@ function Buddy.LoadBars()
         if not B.Table(profile) or not B.Table(profile.actions) then
             B.SetNote(role and L["Keine Vorlage für diese Rolle"] or L["Keine Vorlage für diese Klasse"]);return false
         end
-        local request={class=class,role=role,automatic=not announce and role~=nil}
+        local request={class=class,role=role,profile=profile}
         local reason=B.Reason()
         if reason then
             B.pending=request;B.SetNote(reason)
@@ -164,7 +156,6 @@ function Buddy.LoadBars()
             return false
         end
         if not B.CursorFree() then
-            if request.automatic then B.pending=request end
             B.SetNote(L["Mauszeiger ist belegt; nichts geändert"])
             if announce then Buddy.Message(L["Mauszeiger ist belegt; nichts geändert"]) end
             return false
@@ -192,7 +183,7 @@ function Buddy.LoadBars()
                     if entry.action=="macro" and B.Text(entry.value) then
                         macroScope=select(2,B.MacroLookup(entry.value))
                     end
-                    if entry.action=="macro" and macroScope=="account" then
+                    if entry.action=="macro" and macroScope=="account" and entry.macroBody==nil then
                         -- Accountweite Makros werden weder geladen noch als
                         -- fehlend gezählt; der vorhandene Platz bleibt stehen.
                         ignored=ignored+1
@@ -200,10 +191,13 @@ function Buddy.LoadBars()
                         -- Besitz-/reservierte Plätze: gespeichert, aber nie geschrieben.
                         if entry.action~="empty" then skipped=skipped+1 end
                     else
-                        local current=B.Read(slot)
+                        local current=B.Read(slot,role~=nil)
                         if not current then
                             skipped=skipped+1
-                        elseif current.action==entry.action and current.value==entry.value then
+                        elseif role and current.action=="ignored" then
+                            ignored=ignored+1
+                        elseif current.action==entry.action and current.value==entry.value
+                            and (entry.macroBody==nil or current.macroBody==entry.macroBody) then
                             -- Unveränderte Plätze brauchen keine Cursor-/Leistenoperation.
                         elseif entry.action=="empty" then
                             PickupAction(slot);B.ClearCursor();changed=changed+1
@@ -219,7 +213,7 @@ function Buddy.LoadBars()
                 end
             end
             if B.Reason() then error("barrier") end
-            clicksLoaded=B.ApplyClickBindings(profile)
+            clicksLoaded=B.ApplyClickBindings(profile,role~=nil)
         end)
         B.ClearCursor()
         B.busy=false
@@ -266,23 +260,13 @@ function Buddy.LoadBars()
             local pending=B.pending
             if pending and not B.busy then
                 B.pending=nil
-                if pending.class==B.Context() and (not pending.automatic
-                    or (B.db.roleSync and pending.role==B.Role())) then
-                    B.Apply(not pending.automatic,pending.role)
+                local profile,class=B.Profile(pending.role)
+                if pending.class==class and pending.profile==profile then
+                    B.Apply(true,pending.role)
                 end
             end
             if B.dirty then B.QueueFlush(0) end
         end)
-    end
-
-    local function updateRole()
-        local role=B.Role()
-        if role==B.role then return end
-        B.role=role
-        if B.pending and B.pending.automatic then B.pending=nil end
-        if role and B.db.roleSync then B.Apply(false,role) end
-        if B.dirty then B.QueueFlush() end
-        B.Update()
     end
 
     function B.QueueInitialBackup(delay)
@@ -290,7 +274,6 @@ function Buddy.LoadBars()
         initialBackupQueued=true
         C_Timer.After(delay or 1,function()
             initialBackupQueued=false
-            B.role=B.Role()
             B.ready=true
             B.dirty=true
             B.SetNote(B.db.automatic and L["Automatik an"] or L["Automatik aus"])
@@ -304,24 +287,65 @@ function Buddy.LoadBars()
         if B.db.automatic then B.dirty=true;B.QueueFlush() end
     end
 
-    function B.SetRoleSync(enabled)
-        B.db.roleSync=enabled and true or false
-        if not enabled and B.pending and B.pending.automatic then
-            B.pending=nil
-            B.QueueFlush()
+    function B.SetRole(role)
+        if not roleLabels[role] then return end
+        if role~=B.Role() then
+            Buddy.char.barRole=role
+            if B.pending and B.pending.role then
+                B.pending=nil
+                if B.dirty then B.QueueFlush() end
+            end
+            B.SetNote(nil)
+        else
+            B.RefreshMenu()
         end
-        B.Update()
     end
 
-    function B.Status()
-        local profile,_,_,_,label=B.Profile()
+    local function templateNotice(message)
+        B.SetNote(message)
+        Buddy.Message(message)
+        return false
+    end
+
+    local popupKey="FOREVERBUDDY_CONFIRM_BAR_TEMPLATE"
+
+    local function requestTemplate(save,legacy)
+        local role
+        if not legacy then
+            role=B.Role()
+            if not role then return templateNotice(L["Bitte zuerst eine Rolle auswählen"]) end
+        end
+        local profile,class,_,_,label=B.Profile(role)
+        if not class then return templateNotice(L["Keine Klasse erkannt"]) end
+        if not save and (not B.Table(profile) or not B.Table(profile.actions)) then
+            return templateNotice(role and L["Keine Vorlage für diese Rolle"] or L["Keine Vorlage für diese Klasse"])
+        end
+        if save and profile==nil then return B.Save(true,role) end
+        local prompt=save and L["Vorlage für %s überschreiben?"]
+            or L["Aktuelle Belegungen durch die Vorlage für %s ersetzen?"]
+        if not StaticPopupDialogs or not StaticPopup_Show then
+            return templateNotice(L["Bestätigungsdialog nicht verfügbar"])
+        end
+        StaticPopupDialogs[popupKey]={
+            text="%s",button1=YES,button2=CANCEL,timeout=0,whileDead=true,hideOnEscape=true,
+            OnAccept=function(_,accept) accept() end,
+        }
+        StaticPopup_Show(popupKey,prompt:format(label),nil,function()
+            local current,currentClass=B.Profile(role)
+            if current~=profile or currentClass~=class or (not legacy and B.Role()~=role) then return end
+            if save then B.Save(true,role) else B.Apply(true,role) end
+        end)
+    end
+
+    function B.Status(role)
+        local profile,_,_,_,label=B.Profile(role)
         local state=B.db.automatic and L["Automatik AN"] or L["Automatik AUS"]
         local suffix=B.Table(profile) and L["Vorlage vorhanden"] or L["keine Vorlage"]
         return state,label or L["Keine Klasse erkannt"],suffix,B.Table(profile) and profile or nil
     end
 
     -- Kompakte Bedienung im bestehenden Buddy-Menü; kein eigenes Fenster.
-    B.MENU_HEIGHT=152
+    B.MENU_HEIGHT=122
     function B.BuildMenu(parent,top)
         local box=CreateFrame("Frame",nil,parent,"BackdropTemplate")
         box:SetPoint("TOPLEFT",22,top);box:SetSize(346,B.MENU_HEIGHT)
@@ -335,22 +359,20 @@ function Buddy.LoadBars()
         B.menuNote:SetPoint("TOPLEFT",10,-45);B.menuNote:SetWidth(326)
         B.menuNote:SetJustifyH("LEFT")
         local save=Buddy.Style.Button(CreateFrame("Button",nil,box,"UIPanelButtonTemplate"))
-        save:SetSize(150,24);save:SetPoint("BOTTOMLEFT",10,66);save:SetText(L["Vorlage speichern"])
-        save:SetScript("OnClick",function() B.Save(true) end)
+        save:SetSize(150,24);save:SetPoint("BOTTOMLEFT",10,10);save:SetText(L["Vorlage speichern"])
+        save:SetScript("OnClick",function() return requestTemplate(true) end)
         local load=Buddy.Style.Button(CreateFrame("Button",nil,box,"UIPanelButtonTemplate"))
-        load:SetSize(150,24);load:SetPoint("BOTTOMRIGHT",-10,66);load:SetText(L["Vorlage laden"])
-        load:SetScript("OnClick",function() B.Apply(true) end)
-        local roleSave=Buddy.Style.Button(CreateFrame("Button",nil,box,"UIPanelButtonTemplate"))
-        roleSave:SetSize(326,24);roleSave:SetPoint("BOTTOMLEFT",10,38)
-        roleSave:SetText(L["Vorlage nach Rolle speichern"])
-        roleSave:SetScript("OnClick",B.SaveRole)
-        local sync=CreateFrame("CheckButton",nil,box,"UICheckButtonTemplate")
-        sync:SetSize(24,24);sync:SetPoint("BOTTOMLEFT",10,10)
-        local syncLabel=box:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall")
-        syncLabel:SetPoint("LEFT",sync,"RIGHT",2,0)
-        syncLabel:SetText(L["Synchronisierung nach Rolle"])
-        sync:SetScript("OnClick",function(self) B.SetRoleSync(self:GetChecked()) end)
-        B.syncCheckbox=sync
+        load:SetSize(150,24);load:SetPoint("BOTTOMRIGHT",-10,10);load:SetText(L["Vorlage laden"])
+        load:SetScript("OnClick",function() return requestTemplate(false) end)
+        B.roleCheckboxes={}
+        for index,role in ipairs(roles) do
+            local check=CreateFrame("CheckButton",nil,box,"UICheckButtonTemplate")
+            check:SetSize(24,24);check:SetPoint("BOTTOMLEFT",10+(index-1)*108,40)
+            local label=box:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall")
+            label:SetPoint("LEFT",check,"RIGHT",2,0);label:SetText(L[roleLabels[role]])
+            check:SetScript("OnClick",function() B.SetRole(role) end)
+            B.roleCheckboxes[role]=check
+        end
         B.menu=box
         B.RefreshMenu()
         return B.MENU_HEIGHT
@@ -358,17 +380,19 @@ function Buddy.LoadBars()
     function B.RefreshMenu()
         if B.menuButton and B.RowText then B.menuButton:SetText(B.RowText()) end
         if not B.menu then return end
-        local state,label,suffix,profile=B.Status()
+        local role=B.Role()
+        local state,label,suffix,profile=B.Status(role)
+        if not role then suffix=L["Bitte zuerst eine Rolle auswählen"];profile=nil end
         local editor=B.Table(profile) and B.Text(profile.editor) and (" · "..profile.editor) or ""
         B.menuStatus:SetText(state.." · "..label.." · "..suffix..editor)
         B.menuNote:SetText(B.note or "")
-        B.syncCheckbox:SetChecked(B.db.roleSync==true)
+        for key,check in pairs(B.roleCheckboxes) do check:SetChecked(key==role) end
     end
 
     function B.Command(input)
         local command=(input or ""):lower():match("^%s*(.-)%s*$")
-        if command=="speichern" or command=="save" then B.Save(true)
-        elseif command=="laden" or command=="apply" then B.Apply(true)
+        if command=="speichern" or command=="save" then requestTemplate(true,true)
+        elseif command=="laden" or command=="apply" then requestTemplate(false,true)
         elseif command=="an" or command=="on" then B.SetAutomatic(true)
         elseif command=="aus" or command=="off" then B.SetAutomatic(false)
         elseif command=="status" then
@@ -404,8 +428,6 @@ function Buddy.LoadBars()
                 B.dirty=true
                 B.QueueFlush()
             end
-        elseif event=="PLAYER_ROLES_ASSIGNED" or event=="ROLE_CHANGED_INFORM" or event=="GROUP_ROSTER_UPDATE" then
-            if B.ready then updateRole() end
         elseif event=="PLAYER_REGEN_ENABLED" or event=="CURSOR_CHANGED"
             or event=="UPDATE_OVERRIDE_ACTIONBAR" or event=="UPDATE_VEHICLE_ACTIONBAR"
             or event=="UPDATE_POSSESS_BAR" or event=="UPDATE_SHAPESHIFT_FORM"
@@ -421,8 +443,5 @@ function Buddy.LoadBars()
         "UPDATE_VEHICLE_ACTIONBAR","UPDATE_POSSESS_BAR","UPDATE_SHAPESHIFT_FORM",
         "UPDATE_BONUS_ACTIONBAR","PLAYER_LOGOUT"}) do
         B.events:RegisterEvent(event)
-    end
-    for _,event in ipairs({"PLAYER_ROLES_ASSIGNED","ROLE_CHANGED_INFORM","GROUP_ROSTER_UPDATE"}) do
-        pcall(B.events.RegisterEvent,B.events,event)
     end
 end
