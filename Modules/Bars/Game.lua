@@ -12,18 +12,13 @@ function B.Call(fn,...)
     local ok,a,b,c=pcall(fn,...)
     if ok and B.Public(a) and B.Public(b) and B.Public(c) then return a,b,c end
 end
-function B.Now()
-    local value=B.Call(GetTime)
-    return B.Number(value) and value or 0
-end
 function B.Context()
-    local label,class = B.Call(UnitClass,"player")
+    local label,class=B.Call(UnitClass,"player")
     if not B.Text(class) then return end
-    local guid=B.Call(UnitGUID,"player")
     local name,realm=B.Call(UnitFullName,"player")
-    if not B.Text(guid) or not B.Text(name) then return end
     if not B.Text(realm) then realm=B.Call(GetRealmName) end
-    return class,"default",guid,name..(B.Text(realm) and ("-"..realm) or ""),B.Text(label) and label or class
+    return class,B.Text(name) and (name..(B.Text(realm) and ("-"..realm) or "")) or nil,
+        B.Text(label) and label or class
 end
 
 -- Alle Leistenplätze 1-180: Hauptleiste mit beiden Seiten, Leisten 2-5,

@@ -1,4 +1,4 @@
-# ForeverBuddy 1.1.4
+# ForeverBuddy 1.1.5
 
 <p align="center"><img src="branding/icon-400.png" alt="ForeverBuddy" width="160" height="160"></p>
 
@@ -10,7 +10,7 @@ Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, A
 
 - Charakterübersicht mit vollständigen Namen und den neun Forever-Klassen.
 - Dungeon-Transmog und eigene Schadens-/Heilungsanzeige.
-- Leistenvorlagen je Klasse einschließlich nativer Klickzauberbelegung.
+- Automatische Sicherung je Charakter und Klasse sowie Vorlagen je Klasse und Rolle, jeweils mit nativer Klickzauberbelegung.
 - Berufspost mit neun Materialgruppen und getrennten Empfängern für Horde und Allianz.
 
 ## Sprachen und aktueller Stand
@@ -18,7 +18,6 @@ Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, A
 Die Spielsprache bestimmt die Texte: Deutsch (`deDE`), Englisch (`enUS`, `enGB`), sonst Englisch. Die gemeinsame Codebasis lädt `Locales/enUS.lua` und anschließend die deutschen Übersetzungen. Namen aus Blizzard-APIs (z. B. Gegenstände, Zauber und Klassen) folgen weiterhin der Clientsprache.
 
 - Die Zentrale schließt beim Aufrufen eines Moduls; Aktionsleisten behalten das Menü offen.
-- Bei aktivem ForeverBuddyUI übernimmt dessen charakterbezogene Sicherung die Automatik, damit die alte Klassenvorlage nicht beim Login darübergeschrieben wird. Manuelles Speichern/Laden bleibt verfügbar.
 
 ## Installation
 
@@ -34,9 +33,11 @@ Für WowUp die [Repository-Adresse](https://github.com/norushflow/ForeverBuddy) 
 - `/fb mail` oder `/fbmail`: Empfänger der Berufspost einstellen.
 - Minimap-Kompass: Linksklick öffnet die Zentrale, Rechtsklick die Charakterübersicht.
 
+**Aktionsleisten:** Die automatische Sicherung unter `ForeverbuddyCharDB.actions` funktioniert auch ohne Rollenzuordnung und unter Stufe 10. Mit **Vorlage nach Rolle speichern** legst du die aktuellen Leisten und Klickzauber für die von Blizzard zugewiesene Rolle ab. Aktiviere **Synchronisierung nach Rolle**, damit ein Rollenwechsel die passende Vorlage deiner Klasse lädt. Fehlt sie, bleibt die Belegung bestehen. Die bisherigen Klassenvorlagen sind weiterhin über **Vorlage laden** erreichbar.
+
 **Berufspost:** Vor- und Nachnamen mit Leerzeichen als Empfänger eintragen. An der Mailbox dockt das Fenster rechts an; erst **Senden** startet den Versand. Weitere Briefe folgen nach Bestätigung, **Stoppen** verhindert weitere Briefe. Gemeinsame Materialien gehen an die zuerst gesendete Gruppe. Gebundene oder gesperrte Gegenstände werden übersprungen; vorhandene Anhänge, Geld oder Nachnahme blockieren den Start. Nach Fehlern verbliebene Anhänge im normalen Briefentwurf prüfen.
 
-Die Materialgruppen richten sich nach Handelswaren-Unterklassen, nicht nach vollständigen Rezepten. Mehrdeutige Zutaten werden nicht automatisch zugeordnet. Alte Spezialisierungsvorlagen bleiben gespeichert; die gewünschte Belegung einmal als Klassenvorlage sichern. Vorlagen ohne Klickzauberdaten verändern die Klickbelegung nicht.
+Die Materialgruppen richten sich nach Handelswaren-Unterklassen, nicht nach vollständigen Rezepten. Mehrdeutige Zutaten werden nicht automatisch zugeordnet.
 
 ## Änderungen und Entwicklung
 

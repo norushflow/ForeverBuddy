@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.5
+
+- Aktionsleisten 1–10 und native Klickzauber werden je Charakter und Klasse gesichert, auch unter Stufe 10 und ohne Spezialisierung oder Rolle.
+- Vorlagen für Tank, Heiler und Schaden werden nach Klasse getrennt gespeichert. Die optionale Rollensynchronisierung lädt beim Rollenwechsel die passende Belegung.
+- Bestehende Klassenvorlagen bleiben manuell ladbar. Automatische Sicherungen werden getrennt gespeichert.
+
 ## 1.1.4
 
 - Deutsche und englische Sprachdateien mit gemeinsamer Codebasis; `enUS`/`enGB` und Englisch als Fallback für weitere Sprachen.

@@ -2,25 +2,27 @@ local _, Buddy = ...
 local L = Buddy.L
 local B=Buddy.Bars
 
-local flushQueued,loadQueued,retryQueued=false,false,false
-local function characterStorageOwnsAutomation()
-    local storage=ForeverBuddyUIActionStorage
-    return type(storage)=="table" and type(storage.OwnsAutomaticStorage)=="function"
-        and storage.OwnsAutomaticStorage()
+local flushQueued,initialBackupQueued,retryQueued=false,false,false
+local roleLabels={TANK="Tank",HEALER="Heiler",DAMAGER="Schaden"}
+
+function B.Role()
+    local role=B.Call(UnitGroupRolesAssigned,"player")
+    return roleLabels[role] and role or nil
 end
 
 function Buddy.LoadBars()
     B.db=Buddy.db.bars
     B.db.library=B.Table(B.db.library) and B.db.library or {}
     if B.db.automatic==nil then B.db.automatic=true end
-    B.dirty={};B.ready=false;B.note=L["Wartet auf Anmeldung"]
-    B.class,B.spec=nil,nil
-    B.ignoreUntil=0
+    Buddy.char.actions=B.Table(Buddy.char.actions) and Buddy.char.actions or {}
+    B.ready=false;B.note=L["Wartet auf Anmeldung"]
 
-    function B.Profile()
-        local class,spec,guid,name,label=B.Context()
+    function B.Profile(role)
+        local class,name,label=B.Context()
         local shelf=class and B.db.library[class]
-        return B.Table(shelf) and shelf[spec] or nil,class,spec,guid,name,label
+        local key=role or "default"
+        if role then label=(label or "").." · "..L[roleLabels[role]] end
+        return B.Table(shelf) and shelf[key] or nil,class,key,name,label
     end
     function B.SetNote(text)
         B.note=text
@@ -39,7 +41,7 @@ function Buddy.LoadBars()
         if B.Number(timestamp) then profile.changed=timestamp end
     end
 
-    function B.Save(announce)
+    function B.Save(announce,role)
         local reason=B.Reason()
         if reason then B.SetNote(reason);if announce then Buddy.Message(reason) end;return false end
         if B.busy or not B.ready then
@@ -47,23 +49,25 @@ function Buddy.LoadBars()
             if announce then Buddy.Message(L["Leisten werden noch eingelesen"]) end
             return false
         end
-        local previous,class,spec,_,name,label=B.Profile()
+        local previous,class,key,name,label=B.Profile(role)
         if not class then
             B.SetNote(L["Keine Klasse erkannt"])
             if announce then Buddy.Message(L["Keine Klasse erkannt"]) end
             return false
         end
         local actions, unreadable, ignored = {}, {}, 0
+        if B.Table(previous) and B.Table(previous.actions) then
+            for slot,entry in pairs(previous.actions) do actions[slot]=entry end
+        end
         for _,slot in ipairs(B.slots) do
             local entry,slotReason=B.Read(slot)
-            if entry then
-                if entry.action=="ignored" then
-                    ignored=ignored+1
-                else
-                    actions[slot]=entry
-                end
-            else
+            if not entry then
                 unreadable[#unreadable+1]=slot..(slotReason and (" · "..slotReason) or "")
+            elseif entry.action=="ignored" then
+                ignored=ignored+1
+                actions[slot]=nil
+            elseif entry.action~="keep" or actions[slot]==nil then
+                actions[slot]=entry
             end
         end
         if #unreadable==#B.slots then
@@ -82,6 +86,11 @@ function Buddy.LoadBars()
             notes[#notes+1]=ignored..(ignored==1 and L[" allgemeines Makro ignoriert"] or L[" allgemeine Makros ignoriert"])
         end
         local clicks=B.ReadClickBindings()
+        if not clicks and role then
+            B.SetNote(L["Klickzauber konnten nicht gespeichert werden"])
+            if announce then Buddy.Message(B.note) end
+            return false
+        end
         if not clicks then
             clicks=B.Table(previous) and previous.clickBindings or nil
             notes[#notes+1]=clicks and L["Klickzauber nicht lesbar; bisherige Belegung bleibt gespeichert"]
@@ -91,63 +100,60 @@ function Buddy.LoadBars()
         local profile={actions=actions,clickBindings=clicks}
         stamp(profile,name)
         B.db.library[class]=B.Table(B.db.library[class]) and B.db.library[class] or {}
-        B.db.library[class][spec]=profile
-        B.dirty={}
-        B.clicksDirty=nil
+        B.db.library[class][key]=profile
         B.SetNote(L["Vorlage gespeichert"]..details)
-        if announce then Buddy.Message(L["Vorlage für "]..(label or tostring(spec))..L[" gespeichert"]..details) end
+        if announce then Buddy.Message(L["Vorlage für "]..(label or tostring(key))..L[" gespeichert"]..details) end
         return true
     end
 
     function B.Flush()
-        if characterStorageOwnsAutomation() then return end
-        if not B.db.automatic or not B.ready or B.busy or B.pending then return end
-        if not next(B.dirty) and not B.clicksDirty then return end
+        if not B.db.automatic or not B.ready or B.busy or B.pending or not B.dirty then return end
         local reason=B.Reason()
         if reason then B.SetNote(reason);return end
-        local profile,class,spec,_,name=B.Profile()
-        if not class or class~=B.class or spec~=B.spec
-            or not B.Table(profile) or not B.Table(profile.actions) then
-            B.dirty={};return
-        end
-        local changed=false
-        if B.clicksDirty then
-            local clicks=B.ReadClickBindings()
-            if clicks then profile.clickBindings=clicks;changed=true;B.clicksDirty=nil end
-        end
-        for slot in pairs(B.dirty) do
+        local class,name=B.Context()
+        if not class then return end
+        local storage=Buddy.char.actions
+        local profile=storage[class]
+        if not B.Table(profile) then profile={} end
+        local actions=B.Table(profile.actions) and profile.actions or {}
+        local readable=false
+        for _,slot in ipairs(B.slots) do
             local entry=B.Read(slot)
-            if B.Table(entry) and entry.action=="ignored" then
-                -- Accountweite Makros werden nicht gespeichert. Ein alter
-                -- Eintrag für diesen Platz darf beim nächsten Laden nicht
-                -- wieder über die aktuelle Leiste geschrieben werden.
-                if profile.actions[slot]~=nil then
-                    profile.actions[slot]=nil
-                    changed=true
-                end
-            elseif B.Table(entry) and entry.action~="keep" then
-                profile.actions[slot]=entry
-                changed=true
+            if entry and entry.action~="keep" then
+                readable=true
+                actions[slot]=entry.action~="ignored" and entry or nil
             end
         end
-        B.dirty={}
-        if changed then
+        local clicks=B.ReadClickBindings()
+        if clicks then profile.clickBindings=clicks end
+        if readable or clicks then
+            profile.actions=actions
+            storage[class]=profile
             stamp(profile,name)
-            B.SetNote(L["Änderungen automatisch gespeichert"])
         end
+        B.dirty=not readable or (C_ClickBindings and not clicks) or false
     end
 
-    function B.Apply(announce)
-        local profile,class,spec,_,_,label=B.Profile()
+    function B.SaveRole()
+        local role=B.Role()
+        if role then return B.Save(true,role) end
+        B.SetNote(L["Keine Rolle zugewiesen"])
+        return false
+    end
+
+    function B.Apply(announce,role)
+        B.pending=nil
+        local profile,class=B.Profile(role)
         if not class then
-            B.pending=nil;B.SetNote(L["Keine Klasse erkannt"]);return false
+            B.SetNote(L["Keine Klasse erkannt"]);return false
         end
         if not B.Table(profile) or not B.Table(profile.actions) then
-            B.pending=nil;B.SetNote(L["Keine Vorlage für diese Klasse"]);return false
+            B.SetNote(role and L["Keine Vorlage für diese Rolle"] or L["Keine Vorlage für diese Klasse"]);return false
         end
+        local request={class=class,role=role,automatic=not announce and role~=nil}
         local reason=B.Reason()
         if reason then
-            B.pending=true;B.SetNote(reason)
+            B.pending=request;B.SetNote(reason)
             if announce then Buddy.Message(reason..L["; Laden wird nachgeholt"]) end
             return false
         end
@@ -158,11 +164,12 @@ function Buddy.LoadBars()
             return false
         end
         if not B.CursorFree() then
+            if request.automatic then B.pending=request end
             B.SetNote(L["Mauszeiger ist belegt; nichts geändert"])
             if announce then Buddy.Message(L["Mauszeiger ist belegt; nichts geändert"]) end
             return false
         end
-        B.pending=nil;B.busy=true;B.dirty={};B.clicksDirty=nil
+        B.busy=true
         local skipped,changed,ignored=0,0,0
         local clicksLoaded=true
         local missingMacros={}
@@ -216,11 +223,9 @@ function Buddy.LoadBars()
         end)
         B.ClearCursor()
         B.busy=false
-        -- Wurde das Laden durch Kampfbeginn abgebrochen, am Kampfende fortsetzen.
-        if not ok and B.Reason() then B.pending=true end
-        -- Eigene oder verzögerte Slot-Ereignisse dürfen die Vorlage nicht
-        -- sofort wieder zurückschreiben.
-        B.ignoreUntil=B.Now()+1.5
+        if not ok and B.Reason() then B.pending=request end
+        B.dirty=true
+        B.QueueFlush()
         if ok then
             local details={}
             if not clicksLoaded then details[#details+1]=L["Klickzauber konnten nicht geladen werden"] end
@@ -258,53 +263,65 @@ function Buddy.LoadBars()
         retryQueued=true
         C_Timer.After(delay or .5,function()
             retryQueued=false
-            if B.pending and not B.busy then B.Apply(false) end
-            if next(B.dirty) or B.clicksDirty then B.QueueFlush(0) end
+            local pending=B.pending
+            if pending and not B.busy then
+                B.pending=nil
+                if pending.class==B.Context() and (not pending.automatic
+                    or (B.db.roleSync and pending.role==B.Role())) then
+                    B.Apply(not pending.automatic,pending.role)
+                end
+            end
+            if B.dirty then B.QueueFlush(0) end
         end)
     end
 
-    local function loadContext()
-        local _,class,spec=B.Profile()
-        B.class,B.spec=class,spec
-        B.loadedOnce=true
-        B.ready=true
-        B.dirty={}
-        if not class then
-            B.SetNote(L["Keine Klasse erkannt"])
-        elseif characterStorageOwnsAutomation() then
-            B.SetNote(L["Charakter-Sicherung durch ForeverBuddyUI"])
-        elseif B.db.automatic then
-            B.Apply(false)
-        else
-            B.SetNote(L["Automatik aus"])
-        end
+    local function updateRole()
+        local role=B.Role()
+        if role==B.role then return end
+        B.role=role
+        if B.pending and B.pending.automatic then B.pending=nil end
+        if role and B.db.roleSync then B.Apply(false,role) end
+        if B.dirty then B.QueueFlush() end
+        B.Update()
     end
 
-    function B.QueueLoad(delay)
-        if loadQueued then return end
-        loadQueued=true
+    function B.QueueInitialBackup(delay)
+        if initialBackupQueued then return end
+        initialBackupQueued=true
         C_Timer.After(delay or 1,function()
-            loadQueued=false
-            if B.db then loadContext() end
+            initialBackupQueued=false
+            B.role=B.Role()
+            B.ready=true
+            B.dirty=true
+            B.SetNote(B.db.automatic and L["Automatik an"] or L["Automatik aus"])
+            B.Flush()
         end)
     end
 
     function B.SetAutomatic(enabled)
         B.db.automatic=enabled and true or false
-        B.pending=nil;B.dirty={};B.clicksDirty=nil
         B.SetNote(B.db.automatic and L["Automatik an"] or L["Automatik aus"])
-        if B.db.automatic then B.QueueLoad(.3) end
+        if B.db.automatic then B.dirty=true;B.QueueFlush() end
+    end
+
+    function B.SetRoleSync(enabled)
+        B.db.roleSync=enabled and true or false
+        if not enabled and B.pending and B.pending.automatic then
+            B.pending=nil
+            B.QueueFlush()
+        end
+        B.Update()
     end
 
     function B.Status()
-        local profile,_,_,_,_,label=B.Profile()
+        local profile,_,_,_,label=B.Profile()
         local state=B.db.automatic and L["Automatik AN"] or L["Automatik AUS"]
         local suffix=B.Table(profile) and L["Vorlage vorhanden"] or L["keine Vorlage"]
         return state,label or L["Keine Klasse erkannt"],suffix,B.Table(profile) and profile or nil
     end
 
     -- Kompakte Bedienung im bestehenden Buddy-Menü; kein eigenes Fenster.
-    B.MENU_HEIGHT=96
+    B.MENU_HEIGHT=152
     function B.BuildMenu(parent,top)
         local box=CreateFrame("Frame",nil,parent,"BackdropTemplate")
         box:SetPoint("TOPLEFT",22,top);box:SetSize(346,B.MENU_HEIGHT)
@@ -318,11 +335,22 @@ function Buddy.LoadBars()
         B.menuNote:SetPoint("TOPLEFT",10,-45);B.menuNote:SetWidth(326)
         B.menuNote:SetJustifyH("LEFT")
         local save=Buddy.Style.Button(CreateFrame("Button",nil,box,"UIPanelButtonTemplate"))
-        save:SetSize(150,24);save:SetPoint("BOTTOMLEFT",10,10);save:SetText(L["Vorlage speichern"])
+        save:SetSize(150,24);save:SetPoint("BOTTOMLEFT",10,66);save:SetText(L["Vorlage speichern"])
         save:SetScript("OnClick",function() B.Save(true) end)
         local load=Buddy.Style.Button(CreateFrame("Button",nil,box,"UIPanelButtonTemplate"))
-        load:SetSize(150,24);load:SetPoint("BOTTOMRIGHT",-10,10);load:SetText(L["Vorlage laden"])
+        load:SetSize(150,24);load:SetPoint("BOTTOMRIGHT",-10,66);load:SetText(L["Vorlage laden"])
         load:SetScript("OnClick",function() B.Apply(true) end)
+        local roleSave=Buddy.Style.Button(CreateFrame("Button",nil,box,"UIPanelButtonTemplate"))
+        roleSave:SetSize(326,24);roleSave:SetPoint("BOTTOMLEFT",10,38)
+        roleSave:SetText(L["Vorlage nach Rolle speichern"])
+        roleSave:SetScript("OnClick",B.SaveRole)
+        local sync=CreateFrame("CheckButton",nil,box,"UICheckButtonTemplate")
+        sync:SetSize(24,24);sync:SetPoint("BOTTOMLEFT",10,10)
+        local syncLabel=box:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall")
+        syncLabel:SetPoint("LEFT",sync,"RIGHT",2,0)
+        syncLabel:SetText(L["Synchronisierung nach Rolle"])
+        sync:SetScript("OnClick",function(self) B.SetRoleSync(self:GetChecked()) end)
+        B.syncCheckbox=sync
         B.menu=box
         B.RefreshMenu()
         return B.MENU_HEIGHT
@@ -334,6 +362,7 @@ function Buddy.LoadBars()
         local editor=B.Table(profile) and B.Text(profile.editor) and (" · "..profile.editor) or ""
         B.menuStatus:SetText(state.." · "..label.." · "..suffix..editor)
         B.menuNote:SetText(B.note or "")
+        B.syncCheckbox:SetChecked(B.db.roleSync==true)
     end
 
     function B.Command(input)
@@ -353,7 +382,7 @@ function Buddy.LoadBars()
     if C_ClickBindings and type(hooksecurefunc)=="function" then
         local function clicksChanged()
             if not B.db.automatic or not B.ready or B.busy or B.pending then return end
-            B.clicksDirty=true
+            B.dirty=true
             B.QueueFlush()
         end
         for _,method in ipairs({"SetProfileByInfo","ResetCurrentProfile"}) do
@@ -366,24 +395,24 @@ function Buddy.LoadBars()
     B.events=CreateFrame("Frame")
     B.events:SetScript("OnEvent",function(_,event,arg)
         if event=="PLAYER_LOGIN" then
-            B.QueueLoad(1.5)
+            B.QueueInitialBackup(1.5)
         elseif event=="PLAYER_ENTERING_WORLD" then
-            if not B.loadedOnce and not loadQueued then B.QueueLoad(.5) end
+            if not B.ready and not initialBackupQueued then B.QueueInitialBackup(.5) end
         elseif event=="ACTIONBAR_SLOT_CHANGED" then
             if not B.db.automatic or not B.ready or B.busy or B.pending then return end
-            if B.Now()<B.ignoreUntil then return end
-            local _,class,spec=B.Profile()
-            if class~=B.class or spec~=B.spec then B.QueueLoad(1);return end
-            if B.ValidSlot(arg) then
-                B.dirty[arg]=true
+            if B.ValidSlot(arg) or arg==0 then
+                B.dirty=true
                 B.QueueFlush()
             end
+        elseif event=="PLAYER_ROLES_ASSIGNED" or event=="ROLE_CHANGED_INFORM" or event=="GROUP_ROSTER_UPDATE" then
+            if B.ready then updateRole() end
         elseif event=="PLAYER_REGEN_ENABLED" or event=="CURSOR_CHANGED"
             or event=="UPDATE_OVERRIDE_ACTIONBAR" or event=="UPDATE_VEHICLE_ACTIONBAR"
             or event=="UPDATE_POSSESS_BAR" or event=="UPDATE_SHAPESHIFT_FORM"
             or event=="UPDATE_BONUS_ACTIONBAR" then
-            if not B.busy and (B.pending or next(B.dirty) or B.clicksDirty) then B.QueueRetry() end
+            if not B.busy and (B.pending or B.dirty) then B.QueueRetry() end
         elseif event=="PLAYER_LOGOUT" then
+            B.dirty=true
             B.Flush()
         end
     end)
@@ -392,5 +421,8 @@ function Buddy.LoadBars()
         "UPDATE_VEHICLE_ACTIONBAR","UPDATE_POSSESS_BAR","UPDATE_SHAPESHIFT_FORM",
         "UPDATE_BONUS_ACTIONBAR","PLAYER_LOGOUT"}) do
         B.events:RegisterEvent(event)
+    end
+    for _,event in ipairs({"PLAYER_ROLES_ASSIGNED","ROLE_CHANGED_INFORM","GROUP_ROSTER_UPDATE"}) do
+        pcall(B.events.RegisterEvent,B.events,event)
     end
 end

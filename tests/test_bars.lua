@@ -55,7 +55,10 @@ local function fire(event,arg)
 end
 
 -- Forever hat keine Spezialisierungs-API.
-function UnitClass() return "Jäger","HUNTER" end
+local class,role="HUNTER","NONE"
+function UnitClass() return class=="HUNTER" and "Jäger" or class,class end
+function UnitGroupRolesAssigned() return role end
+function UnitLevel() return 5 end
 function UnitGUID() return "Player-1-ABC" end
 function UnitFullName() return "Buddy","Realm" end
 function GetRealmName() return "Realm" end
@@ -146,7 +149,7 @@ C_SpellBook={
 }
 
 local messages={}
-local Buddy={db={bars={}},loaded={}}
+local Buddy={db={bars={}},char={actions={PALADIN={actions={[1]={action="spell",value=1943}}}}},loaded={}}
 function Buddy.Message(text) messages[#messages+1]=text end
 local toggled=false
 function Buddy.Toggle() toggled=true end
@@ -166,8 +169,11 @@ assert(B.Settable(120) and not B.Settable(121) and not B.Settable(144) and B.Set
 -- Anmeldung ohne Vorlage darf keinen Fehler erzeugen.
 fire('PLAYER_LOGIN');drain()
 assert(B.ready and B.db.automatic==true,'login establishes context and enables automatic mode')
-assert(B.note:find('Keine Vorlage'),'missing profile reported in menu note')
-assert(B.class=='HUNTER' and B.spec=="default")
+local backup=Buddy.char.actions.HUNTER
+assert(backup and backup.actions[120].action=='empty' and backup.clickBindings[1].actionID==133,
+    'login backs up bars and clicks at level 5 without specialization or role')
+assert(Buddy.char.actions.PALADIN.actions[1].value==1943,'login preserves other classes')
+assert(not B.SaveRole(),'saving a role template requires an assigned role')
 
 -- Ausgangsbelegung speichern. Platz 4 ist ein Charaktermakro, Platz 13 ein
 -- accountweites Makro, das vollständig ignoriert werden muss.
@@ -227,24 +233,24 @@ C_Macro=nil
 now=now+5
 bar[1]={action="spell",value=100}
 fire('ACTIONBAR_SLOT_CHANGED',1);drain()
-assert(profile.actions[1].value==100,'changed slot is saved automatically')
+assert(backup.actions[1].value==100,'changed slot is saved automatically')
 
 -- Kampf und Sonderleiste verschieben das Speichern, ohne zu verlieren.
 combat=true
 bar[9]={action="spell",value=1943}
 fire('ACTIONBAR_SLOT_CHANGED',9);drain()
-assert(profile.actions[9].action=='empty','no profile write during combat')
+assert(backup.actions[9].action=='empty','no profile write during combat')
 combat=false;now=now+5
 fire('PLAYER_REGEN_ENABLED');drain()
-assert(profile.actions[9].value==1943,'pending change is saved after combat')
+assert(backup.actions[9].value==1943,'pending change is saved after combat')
 
 bonus=true
 bar[3]={action="spell",value=133}
 fire('ACTIONBAR_SLOT_CHANGED',3);drain()
-assert(profile.actions[3].action=='empty','no profile write during a special bar')
+assert(backup.actions[3].action=='empty','no profile write during a special bar')
 bonus=false;now=now+5
 fire('UPDATE_BONUS_ACTIONBAR');drain()
-assert(profile.actions[3].value==133,'pending change is saved after leaving the special bar')
+assert(backup.actions[3].value==133,'pending change is saved after leaving the special bar')
 
 -- Vorlage laden: verfügbare Typen wiederherstellen, leere Plätze leeren,
 -- unbekannte und nicht verfügbare Einträge auslassen.
@@ -261,15 +267,15 @@ profile.actions[8]={action="spell",value=777} -- auf diesem Charakter nicht erle
 now=now+5
 local ok=B.Apply(true)
 assert(ok,'profile applies')
-assert(bar[1].value==100 and bar[2].value==5512,'spell and item restored')
-assert(bar[3].value==133 and bar[12]==nil,'saved spell restored; empty profile slot clears the bar slot')
+assert(bar[1].value==133 and bar[2].value==5512,'spell and item restored')
+assert(bar[3]==nil and bar[12]==nil,'saved spell restored; empty profile slot clears the bar slot')
 assert(bar[4].value=='Extra' and bar[5].action=='flyout','macro and flyout restored')
 assert(bar[7].action=='equipmentset' and bar[7].value=='Raid','equipment set restored by name')
 assert(bar[6].action=='unknown','unsupported entry left untouched')
 assert(bar[8].value==100,'unavailable spell skipped without touching the slot')
-assert(B.note:find('7 Plätze geladen') and B.note:find('2 ausgelassen'),'apply summary counts changed/skipped')
+assert(B.note:find('8 Plätze geladen') and B.note:find('2 ausgelassen'),'apply summary counts changed/skipped')
 assert(profile.actions[8].value==777,'skipped entry stays in the profile')
-assert(profile.actions[1].value==100,'apply does not overwrite its own profile')
+assert(profile.actions[1].value==133,'apply does not overwrite its own profile')
 
 -- Alte Vorlagen mit accountweiten Makros bleiben ladbar: die Einträge werden
 -- übersprungen, vorhandene Aktionen bleiben stehen. Fehlende Charaktermakros
@@ -294,20 +300,20 @@ profile.actions[14]=nil
 now=now+5
 bar[15]={action="macro",index=20,value="Heal"}
 fire('ACTIONBAR_SLOT_CHANGED',15);drain()
-assert(profile.actions[15].value=="Heal",'character macro is saved automatically')
+assert(backup.actions[15].value=="Heal",'character macro is saved automatically')
 now=now+5
 bar[15]={action="macro",index=1,value="Raid"}
 fire('ACTIONBAR_SLOT_CHANGED',15);drain()
-assert(profile.actions[15]==nil,'account macro removes the old stored entry')
+assert(backup.actions[15]==nil,'account macro removes the old stored entry')
 now=now+5
 bar[15]=nil
 fire('ACTIONBAR_SLOT_CHANGED',15);drain()
-assert(profile.actions[15] and profile.actions[15].action=='empty','empty slot is stored again')
+assert(backup.actions[15] and backup.actions[15].action=='empty','empty slot is stored again')
 
 -- Spezialisierungsereignisse haben keinen Einfluss auf die gemeinsame Vorlage.
 now=now+5
 fire('PLAYER_SPECIALIZATION_CHANGED','player');drain()
-assert(B.Profile()==profile and B.spec=="default")
+assert(B.Profile()==profile)
 
 -- Klickzauber werden kopiert, wiederhergestellt und automatisch gespeichert.
 assert(profile.clickBindings[1].actionID==133 and profile.clickBindings~=clicks)
@@ -316,18 +322,18 @@ assert(profile.clickBindings[1].actionID==133,'client mutation does not alter sa
 assert(B.Apply(true) and clicks[1].actionID==133,'click bindings restored with bars')
 assert(clicks~=profile.clickBindings,'apply passes a copy')
 C_ClickBindings.SetProfileByInfo({{type=1,actionID=100,button="RightButton",modifiers=2}});drain()
-assert(profile.clickBindings[1].actionID==100,'click-only edit automatically saved')
+assert(backup.clickBindings[1].actionID==100,'click-only edit automatically saved')
 combat=true
 C_ClickBindings.SetProfileByInfo({});drain()
-assert(#profile.clickBindings==1,'click changes wait during combat')
+assert(#backup.clickBindings==1,'click changes wait during combat')
 combat=false
 fire('PLAYER_REGEN_ENABLED');drain()
-assert(#profile.clickBindings==0,'empty click profile saved after combat')
+assert(#backup.clickBindings==0,'empty click profile saved after combat')
 C_ClickBindings.SetProfileByInfo({{type=1,actionID=100,button="RightButton",modifiers=0}});drain()
 C_ClickBindings.ResetCurrentProfile();drain()
-assert(#profile.clickBindings==0,'reset automatically saved')
+assert(#backup.clickBindings==0,'reset automatically saved')
 clicks={{type=1,actionID=133,button="LeftButton",modifiers=0}}
-assert(B.Apply(true) and #clicks==0,'empty profile clears click bindings')
+assert(B.Apply(true) and clicks[1].actionID==133,'automatic changes leave the template intact')
 local clickAPI=C_ClickBindings
 C_ClickBindings=nil
 assert(B.Apply(true) and B.note:find('Klickzauber konnten nicht geladen'),
@@ -350,22 +356,23 @@ assert(B.menuButton.text=='Aktionsleisten · Automatik AUS','menu row reflects s
 now=now+5
 bar[1]={action="spell",value=1943}
 fire('ACTIONBAR_SLOT_CHANGED',1);drain()
-assert(profile.actions[1].value==100,'automatic off leaves the profile untouched')
+assert(backup.actions[1].value==133,'automatic off leaves the backup untouched')
 B.SetAutomatic(true);drain()
-assert(B.menuButton.text=='Aktionsleisten · Automatik AN' and bar[1].value==100,
-    'enabling automatic mode reloads the profile')
+assert(B.menuButton.text=='Aktionsleisten · Automatik AN' and bar[1].value==1943 and backup.actions[1].value==1943,
+    'enabling automatic mode backs up the current layout')
 
 -- Menübereich im bestehenden Fenster.
 local menuHeight=B.BuildMenu(object(),-100)
 assert(menuHeight==B.MENU_HEIGHT and B.menuStatus.text:find('Automatik AN')
     and B.menuStatus.text:find('Jäger'),'inline menu shows state and specialization')
 assert(B.menuNote.text==B.note,'inline menu shows the last note')
-local saveButton,loadButton
+local saveButton,loadButton,roleSaveButton
 for _,frame in ipairs(frames) do
     if frame.text=='Vorlage speichern' then saveButton=frame end
     if frame.text=='Vorlage laden' then loadButton=frame end
+    if frame.text=='Vorlage nach Rolle speichern' then roleSaveButton=frame end
 end
-assert(saveButton and loadButton,'both inline buttons exist')
+assert(saveButton and loadButton and roleSaveButton and B.syncCheckbox,'all inline controls exist')
 -- Kommandos
 messages={}
 SlashCmdList.FOREVERBUDDYBARS('status')
@@ -386,7 +393,7 @@ combat=true;bar[1]={action="spell",value=1943}
 assert(not B.Apply(true) and B.pending and B.note:find('Kampfende'),'apply is deferred in combat')
 combat=false;now=now+5
 fire('PLAYER_REGEN_ENABLED');drain()
-assert(not B.pending and bar[1].value==100,'deferred apply resumes after combat')
+assert(not B.pending and bar[1].value==133,'deferred apply resumes after combat')
 
 -- Kampfbeginn mitten im Laden: der Rest wird nach dem Kampfende nachgeholt.
 local expected=Buddy.db.bars.library.HUNTER.default.actions[2]
@@ -420,8 +427,8 @@ local before=Buddy.db.bars.library.HUNTER.default
 bar[10]={action="secret",value=secret}
 assert(B.Save(true),'save skips a secret slot instead of aborting')
 local saved=Buddy.db.bars.library.HUNTER.default
-assert(saved and saved~=before and saved.actions[10]==nil,'secret slot is not stored')
-assert(saved.actions[1] and saved.actions[1].value==100,'other slots are still saved')
+assert(saved and saved~=before and saved.actions[10]==before.actions[10],'secret slot retains its previous value')
+assert(saved.actions[1] and saved.actions[1].value==133,'other slots are still saved')
 assert(B.note:find('nicht lesbar') and B.note:find('10') and B.note:find('geschützter Wert'),'note names the unreadable slot and reason')
 bar[10]=nil
 now=now+5
@@ -448,24 +455,74 @@ now=now+5
 bar[1]={action="spell",value=1943}
 B.ready=false
 fire('PLAYER_LOGIN');drain()
-assert(B.ready and bar[1].value==100,'login loads an existing profile')
+assert(B.ready and bar[1].value==1943 and backup.actions[1].value==1943,'login backs up instead of applying the manual template')
 
 -- Logout schreibt einen noch offenen automatischen Änderungsstand.
 now=now+5
 bar[11]={action="spell",value=100}
 fire('ACTIONBAR_SLOT_CHANGED',11);drain()
-assert(saved.actions[11].value==100,'last change saved before logout')
+assert(backup.actions[11].value==100,'last change saved before logout')
 assert(B.events.events.PLAYER_LOGOUT and not B.events.events.PLAYER_SPECIALIZATION_CHANGED
     and B.events.events.ACTIONBAR_SLOT_CHANGED,'required events are registered')
 
 print('PASS: bar profiles, automatic save/load, click bindings, guards, secrets and inline menu')
 
-local apply=B.Apply
-local applied=0
-B.Apply=function() applied=applied+1;return true end
-ForeverBuddyUIActionStorage={OwnsAutomaticStorage=function() return true end}
-B.db.automatic=true;B.QueueLoad(0);drain()
-assert(applied==0,'character storage owns automatic restore when UI addon is active')
-B.Apply=apply
-ForeverBuddyUIActionStorage=nil
-print('PASS: optional ForeverBuddyUI coordination prevents competing automatic restores')
+-- Vorlagen werden je Klasse und Rolle gespeichert und nur bei einem Rollenwechsel geladen.
+local function changeRole(value)
+    role=value
+    fire('PLAYER_ROLES_ASSIGNED');drain()
+end
+local function setLayout(value)
+    bar[120]={action='spell',value=value}
+    C_ClickBindings.SetProfileByInfo({{type=1,actionID=value,button='RightButton',modifiers=2}})
+    drain()
+end
+local function expectLayout(value)
+    assert(bar[120].value==value and clicks[1].actionID==value,'bars and native clicks match')
+end
+for _,entry in ipairs({{'TANK',100},{'HEALER',133},{'DAMAGER',1943}}) do
+    changeRole(entry[1]);setLayout(entry[2])
+    assert(roleSaveButton:GetScript('OnClick')(),'role template saved through the menu')
+end
+local hunter=Buddy.db.bars.library.HUNTER
+assert(hunter.default==saved,'legacy class template remains independently available')
+class='PALADIN'
+changeRole('TANK');setLayout(133)
+assert(B.SaveRole())
+local paladin=Buddy.db.bars.library.PALADIN
+assert(paladin.TANK.actions[120].value==133 and hunter.TANK.actions[120].value==100,
+    'a second class saves the same role independently')
+assert(Buddy.char.actions.PALADIN.actions[120].value==133 and backup.actions[120].value==1943)
+B.SetRoleSync(true)
+changeRole('HEALER')
+expectLayout(133)
+assert(not paladin.HEALER,'missing class template leaves layout unchanged')
+class='HUNTER'
+changeRole('TANK');expectLayout(100)
+changeRole('HEALER');expectLayout(133)
+changeRole('DAMAGER');expectLayout(1943)
+assert(backup.actions[120].value==1943 and backup.clickBindings[1].actionID==1943)
+setLayout(100)
+assert(hunter.DAMAGER.actions[120].value==1943 and hunter.DAMAGER.clickBindings[1].actionID==1943,
+    'autosave does not alter a role template')
+changeRole('DAMAGER');expectLayout(100)
+local readRoleClicks=C_ClickBindings.GetProfileInfo
+C_ClickBindings.GetProfileInfo=function() error('temporarily unavailable') end
+local oldDamage=hunter.DAMAGER
+assert(not B.SaveRole() and hunter.DAMAGER==oldDamage,'unreadable click bindings preserve the whole role template')
+C_ClickBindings.GetProfileInfo=readRoleClicks
+combat=true
+changeRole('HEALER');expectLayout(100)
+assert(B.pending,'role change waits during combat')
+B.SetRoleSync(false)
+combat=false
+fire('PLAYER_REGEN_ENABLED');drain()
+expectLayout(100)
+changeRole('DAMAGER');expectLayout(100)
+B.SetRoleSync(true)
+changeRole('HEALER');expectLayout(133)
+changeRole('NONE');expectLayout(133)
+setLayout(1943)
+assert(backup.actions[120].value==1943,'autosave continues without assigned role')
+
+print('PASS: level 5, class and role isolation, optional role sync, native clicks and legacy templates')
