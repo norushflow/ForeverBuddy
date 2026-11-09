@@ -7,3 +7,9 @@ Vor und nach Änderungen git status --short und ./tools/check.sh ausführen.
 Diff prüfen; Client-, Kampf- und Taintprüfung bleibt im Forever-Client erforderlich.
 ./tools/package.sh erstellt lokale ZIPs ohne Tests oder Entwicklerdokumentation.
 Uploads nur nach Auftrag in das eigene Repository.
+
+## Veröffentlichungsziel
+
+- Das öffentliche Repository `norushflow/ForeverBuddy` ist das freigegebene Upload- und Releaseziel.
+- Ein ausdrücklicher Releaseauftrag erlaubt Commit, Push und den zur TOC passenden Versions-Tag. Ohne Release- oder Pushauftrag nur lokal vorbereiten.
+- Nur dieses Addon veröffentlichen; Sammelordner, lokale Archive und SavedVariables bleiben lokal.
