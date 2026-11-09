@@ -88,6 +88,7 @@ C_TransmogCollection={GetItemInfo=function(link)
  GetAppearanceInfoBySource=function(source) collectionReads=collectionReads+1;return {appearanceIsCollected=collected[source/10]} end}
 function GetNumClasses() return 2 end
 C_CreatureInfo={GetClassInfo=function(id) return {classID=id,className=id==1 and 'Krieger' or 'Paladin'} end}
+assert(loadfile('Core.lua'))('Foreverbuddy',B)
 assert(loadfile('Style.lua'))('Foreverbuddy',B)
 assert(loadfile('Modules/Transmog.lua'))('Foreverbuddy',B)
 B.LoadTransmog();local T=B.Transmog

@@ -151,16 +151,13 @@ return math.floor(SafeNum(equipped) + 0.5)
 end
 
 local function GetRestedXPNow()
-local rested = (GetXPExhaustion and GetXPExhaustion()) or 0
-return SafeNum(rested)
+if not GetXPExhaustion then return 0 end
+return SafeNum(GetXPExhaustion())
 end
 
-local function GetRestXPPercent()
-local maxXP = SafeNum(UnitXPMax("player"))
-if maxXP <= 0 then return 0 end
-local rested = GetRestedXPNow()
-if rested <= 0 then return 0 end
-return (rested / maxXP) * 100
+local function RestXPPercent(rested, maxXP)
+if maxXP <= 0 or rested <= 0 then return 0 end
+return Round1((rested / maxXP) * 100)
 end
 
 local function EstimateRestedXPPercent(char)
@@ -201,10 +198,10 @@ c.level   = SafeNum(UnitLevel("player"))
 c.ilvl    = SafeNum(GetItemLevel())
 
 c.xpmax = SafeNum(UnitXPMax("player"))
-c.rested_xp = SafeNum(GetRestedXPNow())
+c.rested_xp = GetRestedXPNow()
 c.rested_ts = time()
 
-c.restxp_pct = Round1(GetRestXPPercent())
+c.restxp_pct = RestXPPercent(c.rested_xp, c.xpmax)
 c.updated = time()
 end
 
@@ -264,8 +261,7 @@ s.asc = false
 end
 end
 
-local function MatchesFilters(c)
-local flt = EnsureFilters()
+local function MatchesFilters(c, flt)
 if flt.class and c.class ~= flt.class then return false end
 if flt.prof then
 local p1 = c.prof1_name
@@ -298,42 +294,32 @@ return c[key]
 end
 
 local function BuildSortedList()
-local t = {}
-for _, c in pairs(AltMiniDB.chars) do
-if c and c.name and c.realm and MatchesFilters(c) then
-table.insert(t, c)
-end
-end
+    local characters, sortValues = {}, {}
+    local filters = EnsureFilters()
+    local sort = GetSortState()
+    local sortKey, ascending = sort.key, sort.asc
+    local numeric = sortKey == "level" or sortKey == "ilvl" or sortKey == "restxp_pct" or sortKey == "playtime_sec"
 
-local s = GetSortState()
-local sortKey = s.key
-local asc = s.asc
+    for _, character in pairs(AltMiniDB.chars) do
+        if character and character.name and character.realm and MatchesFilters(character, filters) then
+            local value = GetCellValueForSort(character, sortKey)
+            sortValues[character] = numeric and SafeNum(value) or tostring(SafeStr(value))
+            characters[#characters+1] = character
+        end
+    end
 
-table.sort(t, function(a, b)
-local av = GetCellValueForSort(a, sortKey)
-local bv = GetCellValueForSort(b, sortKey)
+    table.sort(characters, function(a, b)
+        local av, bv = sortValues[a], sortValues[b]
+        if av == bv then
+            local ar, br = a.realm or "", b.realm or ""
+            if ar == br then return (a.name or "") < (b.name or "") end
+            return ar < br
+        end
+        if ascending then return av < bv end
+        return av > bv
+    end)
 
-local isNum = (sortKey == "level" or sortKey == "ilvl" or sortKey == "restxp_pct" or sortKey == "playtime_sec")
-if isNum then
-av, bv = SafeNum(av), SafeNum(bv)
-if av == bv then
-local ar, br = a.realm or "", b.realm or ""
-if ar == br then return (a.name or "") < (b.name or "") end
-return ar < br
-end
-if asc then return av < bv else return av > bv end
-else
-av, bv = tostring(SafeStr(av)), tostring(SafeStr(bv))
-if av == bv then
-local ar, br = a.realm or "", b.realm or ""
-if ar == br then return (a.name or "") < (b.name or "") end
-return ar < br
-end
-if asc then return av < bv else return av > bv end
-end
-end)
-
-return t
+    return characters
 end
 
 local CLASS_TEX = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"

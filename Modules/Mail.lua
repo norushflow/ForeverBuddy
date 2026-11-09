@@ -42,9 +42,11 @@ function Buddy.LoadMail()
         return db.recipientsByFaction[faction], faction
     end
     local C = C_Container
+    local events = CreateFrame("Frame")
     local active, opened, pending, delay, timeout
     local function note(text) Buddy.Message(text) end
     local function stop(text)
+        if active then events:SetScript("OnUpdate", nil) end
         active, pending, delay, timeout = nil, nil, nil, nil
         if text then note(text) end
     end
@@ -87,6 +89,21 @@ function Buddy.LoadMail()
         pending,timeout=true,0
         SendMail(active.recipient,L["Materialien: "]..active.group[2],L["Gesendet mit ForeverBuddy"])
     end
+    local function updateSend(_, elapsed)
+        if timeout then
+            timeout = timeout + elapsed
+            if timeout > 15 then
+                stop(L["Keine Versandbestätigung. Bitte Mailbox prüfen; kein automatischer Wiederholungsversuch."])
+            end
+        end
+        if delay then
+            delay = delay + elapsed
+            if delay >= 1 then
+                delay = nil
+                batch()
+            end
+        end
+    end
     function M.Start(group)
         if active then note(L["Versand läuft bereits."]); return end
         if not opened then note(L["Bitte zuerst eine Mailbox öffnen."]); return end
@@ -99,6 +116,7 @@ function Buddy.LoadMail()
         local ownName=(first or UnitName("player") or "")..(last and last~="" and (" "..last) or "")
         if recipient:lower()==ownName:lower() then note(L["Bitte einen anderen Charakter als Empfänger wählen."]); return end
         active={group=group,recipient=recipient}
+        events:SetScript("OnUpdate", updateSend)
         batch()
     end
     function M.Open()
@@ -161,7 +179,6 @@ function Buddy.LoadMail()
         end
         p:Show()
     end
-    local events=CreateFrame("Frame")
     for _,event in ipairs({"MAIL_SHOW","MAIL_CLOSED","MAIL_SEND_SUCCESS","MAIL_FAILED","PLAYER_REGEN_DISABLED"}) do events:RegisterEvent(event) end
     events:SetScript("OnEvent",function(_,event)
         if event=="MAIL_SHOW" then opened=true; M.Open()
@@ -171,10 +188,6 @@ function Buddy.LoadMail()
             if event=="MAIL_SEND_SUCCESS" then pending=nil; timeout=nil; delay=0
             elseif event=="MAIL_FAILED" then stop(L["Versand fehlgeschlagen. Bitte Empfänger und Brief prüfen."]) end
         end
-    end)
-    events:SetScript("OnUpdate",function(_,elapsed)
-        if timeout then timeout=timeout+elapsed; if timeout>15 then stop(L["Keine Versandbestätigung. Bitte Mailbox prüfen; kein automatischer Wiederholungsversuch."]) end end
-        if delay then delay=delay+elapsed; if delay>=1 then delay=nil; if active then batch() end end end
     end)
     SLASH_FOREVERBUDDYMAIL1="/fbmail"
     SlashCmdList.FOREVERBUDDYMAIL=M.Open

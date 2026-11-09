@@ -1,5 +1,6 @@
-# v1.1.6
+# v1.1.7
 
-- Choose the role for action bar templates manually for each character. Role changes no longer load templates automatically.
-- Loading or overwriting a template now asks for confirmation.
-- Shared role templates now save the contents of character macros used on action bars and in built-in click casting.
+- Run the profession mail update only while a send is in progress.
+- Reduce repeated sorting and rested XP calculations in the character overview.
+- Reuse the existing frame and tooltip guards in the transmog module.
+- Streamline local checks and make release ZIPs reproducible.

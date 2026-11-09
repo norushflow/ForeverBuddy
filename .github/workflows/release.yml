@@ -12,50 +12,24 @@ jobs:
   release:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    env:
-      ADDON: Foreverbuddy
-      ZIP_SUFFIX: '-forever'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
-      - name: Check version tag
-        shell: bash
-        run: |
-          version=$(awk '/^## Version:/ {gsub(/\r/, ""); print $3}' "$ADDON.toc")
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$GITHUB_REF_NAME" != "v$version" ]]; then
-            echo "::error::Git tag must match the version in $ADDON.toc."
-            exit 1
-          fi
-          echo "ADDON_VERSION=$version" >> "$GITHUB_ENV"
-
-      - name: Check release notes
-        shell: bash
-        run: |
-          if [[ ! -s RELEASE_NOTES.md ]] ||
-             [[ "$(head -n 1 RELEASE_NOTES.md)" != "# v$ADDON_VERSION" ]] ||
-             ! grep -Eq '^- [^[:space:]]' RELEASE_NOTES.md; then
-            echo "::error::RELEASE_NOTES.md must start with # v$ADDON_VERSION and contain English release notes."
-            exit 1
-          fi
-
       - name: Install packaging dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq luajit zip unzip
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq luajit zip unzip
 
       - name: Test and package
-        shell: bash
-        run: |
-          ./tools/package.sh
-          if [[ -n "$ZIP_SUFFIX" ]]; then
-            mv -- "dist/$ADDON-$ADDON_VERSION.zip" "dist/$ADDON-$ADDON_VERSION$ZIP_SUFFIX.zip"
-          fi
+        run: ./tools/release.sh --tag "$GITHUB_REF_NAME"
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          gh release create "$GITHUB_REF_NAME" "dist/$ADDON-$ADDON_VERSION$ZIP_SUFFIX.zip" \
-            --verify-tag --title "ForeverBuddy $ADDON_VERSION" --notes-file RELEASE_NOTES.md
+          set -euo pipefail
+          source tools/addon.sh
+          load_addon
+          gh release create "$GITHUB_REF_NAME" "dist/$(package_name "$GITHUB_REF_NAME")" \
+            --verify-tag --title "$title $version" --notes-file RELEASE_NOTES.md

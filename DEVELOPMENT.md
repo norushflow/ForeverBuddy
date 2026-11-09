@@ -1,19 +1,11 @@
 # Entwicklung und Release
 
-Arbeitsstand ist dieses Git-Repository. Projektregeln: [AGENTS.md](AGENTS.md).
-Benötigt werden LuaJIT, zip und unzip.
+Benötigt werden Bash und LuaJIT, für ZIPs zusätzlich zip und unzip. Die TOC definiert Dateireihenfolge, Zielclient und Version.
 
-- `./tools/check.sh`: TOC-Dateipfade, Lua-Syntax und Funktionstests prüfen.
-- `./tools/package.sh`: geprüftes Installations-ZIP unter `dist/` erstellen. Bestehende gleichnamige Pakete werden nicht überschrieben.
-- Version in TOC, README und internen Versionsmeldungen abgleichen.
-- Geprüften Stand nach `main` übertragen. Ein Tag passend zur TOC (`v1.1.1`) startet die Veröffentlichung für WowUp.
-- Vor dem Tag `RELEASE_NOTES.md` ersetzen. Erste Zeile `# vX.Y.Z` passend zur TOC-Version, danach englische Markdown-Stichpunkte nur für dieses Release. Die Historie bleibt in `CHANGELOG.md`.
-- GitHub verwendet `RELEASE_NOTES.md` direkt. Für CurseForge denselben Tag nach erfolgreichem GitHub-Workflow mit dem Packager und der eingecheckten `.pkgmeta` veröffentlichen. Bei einem manuellen ZIP-Upload den Inhalt derselben Datei als Markdown einfügen.
+- `./tools/check.sh --quick` prüft alle Lua-Dateien und die TOC-Struktur. Die Tests folgen bekannten Änderungen aus Git. Bei gemeinsam genutzten oder unbekannten Pfaden sowie ohne Änderungen läuft die gesamte Suite. Mit `--quick -- PFAD ...` lässt sich der Prüfumfang für einen Arbeitsschritt explizit wählen.
+- `./tools/check.sh --full` ist der Standard. Er prüft alle Testszenarien, SavedVariables-Namen, Abhängigkeiten, Versionsstand und Paketdateien. Erfolg ergibt eine Zeile. `--debug` zeigt auch erfolgreiche Testausgaben.
+- `./tools/release.sh` baut nach einem Volltest ein reproduzierbares ZIP in `dist/`. `./tools/package.sh` bleibt als bisheriger Aufruf verfügbar. `--output-dir VERZEICHNIS` erlaubt ein anderes Ziel. Vorhandene ZIPs bleiben erhalten.
+- Nach Releasefreigabe Version in TOC, README und gegebenenfalls UI-Version und Startmeldung abgleichen. In `CHANGELOG.md` unter `## X.Y.Z` kurze englische Aufzählungspunkte pflegen. `RELEASE_NOTES.md` mit `# vX.Y.Z` und den englischen Punkten für GitHub und CurseForge aktualisieren. Ein passender Tag `vX.Y.Z` startet den GitHub-Workflow für WowUp.
+- Das ZIP enthält TOC-Dateien, geladene Lua-/XML-Dateien, Medien und Herkunftshinweise. CurseForge-Projekt-ID und Paketkonfiguration stehen in TOC und `.pkgmeta`.
 
-Das ZIP enthält Laufzeitdateien, Medien und aktuelle Herkunftshinweise. Entwicklerdokumentation, Tests und Workflows werden nicht installiert.
-
-## Spielprüfung vor Veröffentlichung
-
-Lokale Tests ersetzen keine Prüfung im Zielclient. Login, gespeicherte Einstellungen, Bedienung, Kampf, Gruppen/Raid und mögliche Taint-Meldungen prüfen.
-
-Vorbereitung am 08.11.2026: lokale Syntax-, TOC- und Funktionstests erfolgreich.
+Vor einer Veröffentlichung Login, gespeicherte Einstellungen, Bedienung, Kampf, Gruppen/Raid und Taint im Zielclient prüfen.

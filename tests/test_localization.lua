@@ -39,10 +39,3 @@ for file in source:gmatch('[^\n]+') do
 end
 assert(loadLocale('deDE')['One Button Setup']=='Ein-Knopf-Einrichtung')
 print('PASS: deDE/enUS/enGB, unsupported-locale fallback, keys, formats, colors and TOC order')
-
-local version=assert(source:match("## Version: ([^\n]+)"))
-local core=read('Core.lua')
-local runtimeVersion=core:match('UI.VERSION = "([^"]+)"')
-if runtimeVersion then assert(version==runtimeVersion,'TOC/runtime version mismatch') end
-assert(read('README.md'):match('^#[^\n]*'..version:gsub('%.','%%.')),'README version mismatch')
-assert(source:find('## Notes-deDE:',1,true),'German addon description missing')

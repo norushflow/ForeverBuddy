@@ -13,3 +13,5 @@ ignore:
   - docs
   - tests
   - tools
+  - TEMP
+  - dist

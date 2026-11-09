@@ -6,17 +6,9 @@ local function public(v) return not (issecretvalue and issecretvalue(v)) end
 local function number(v) return public(v) and type(v)=="number" end
 local function text(v) return public(v) and type(v)=="string" end
 local function record(v) return public(v) and type(v)=="table" end
-local function foreign(frame, fn)
-    if not public(frame) or not frame then return false end
-    return pcall(function()
-        local forbidden=frame:IsForbidden()
-        if not public(forbidden) or forbidden then error("forbidden") end
-        return fn(frame)
-    end)
-end
 local function journalAvailable()
     if not EncounterJournal then return true end
-    local ok, hidden = foreign(EncounterJournal,function(f) local shown=f:IsShown();return public(shown) and not shown end)
+    local ok, hidden = Buddy.Foreign(EncounterJournal,function(f) local shown=f:IsShown();return public(shown) and not shown end)
     return ok and public(hidden) and hidden
 end
 local function current()
@@ -49,7 +41,7 @@ function T.ReadLoot(classID)
     end
     local oldInstance,oldEncounter
     if EncounterJournal then
-        local ok,a,b=foreign(EncounterJournal,function(f) return f.instanceID,f.encounterID end)
+        local ok,a,b=Buddy.Foreign(EncounterJournal,function(f) return f.instanceID,f.encounterID end)
         if not ok then return nil,L["Journal derzeit nicht lesbar."] end
         oldInstance=number(a) and a>0 and a or nil
         oldEncounter=number(b) and b>0 and b or nil
@@ -307,13 +299,13 @@ function T.Toggle()
             end)
             b:SetScript("OnEnter",function(self)
                 if self.entry and self.entry.row and self.entry.row.link and not InCombatLockdown() then
-                    foreign(GameTooltip,function(t) t:SetOwner(self,"ANCHOR_RIGHT");t:SetHyperlink(self.entry.row.link);t:Show() end)
+                    Buddy.Foreign(GameTooltip,function(t) t:SetOwner(self,"ANCHOR_RIGHT");t:SetHyperlink(self.entry.row.link);t:Show() end)
                 end
             end)
-            b:SetScript("OnLeave",function() foreign(GameTooltip,function(t) t:Hide() end) end)
+            b:SetScript("OnLeave",Buddy.HideTooltip)
         end
         p:EnableMouseWheel(true);p:SetScript("OnMouseWheel",function(_,delta) T.offset=(T.offset or 0)-delta*3;T.Render() end)
-        p:SetScript("OnHide",function() foreign(GameTooltip,function(t) t:Hide() end) end)
+        p:SetScript("OnHide",Buddy.HideTooltip)
         T.page=label(p,"",20,-499,600)
         local refresh=Buddy.Style.Button(CreateFrame("Button",nil,p,"UIPanelButtonTemplate"))
         refresh:SetSize(180,24);refresh:SetPoint("BOTTOMRIGHT",-20,12);refresh:SetText(L["Neu einlesen"])
@@ -331,13 +323,13 @@ function Buddy.LoadTransmog()
         "TRANSMOG_COLLECTION_SOURCE_ADDED","TRANSMOG_COLLECTION_SOURCE_REMOVED","ADDON_LOADED"}) do e:RegisterEvent(event) end
     local function hookJournal()
         if EncounterJournal and not T.journalHook then
-            local ok=foreign(EncounterJournal,function(f) f:HookScript("OnHide",function() if T.context then schedule() end end) end)
+            local ok=Buddy.Foreign(EncounterJournal,function(f) f:HookScript("OnHide",function() if T.context then schedule() end end) end)
             T.journalHook=ok
         end
     end
     e:SetScript("OnEvent",function(_,event,id)
         if event=="ADDON_LOADED" then hookJournal();return end
-        if event=="PLAYER_REGEN_DISABLED" then foreign(GameTooltip,function(t) t:Hide() end);return end
+        if event=="PLAYER_REGEN_DISABLED" then Buddy.HideTooltip();return end
         if event=="EJ_LOOT_DATA_RECIEVED" or event=="ITEM_DATA_LOAD_RESULT" then
             if T.scanning or not T.result or not number(id) or not T.result.pending[id] then return end
             T.retryLoot=true

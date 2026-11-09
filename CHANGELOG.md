@@ -1,10 +1,17 @@
 # Changelog
 
+## 1.1.7
+
+- Run the profession mail update only while a send is in progress.
+- Reduce repeated sorting and rested XP calculations in the character overview.
+- Reuse the existing frame and tooltip guards in the transmog module.
+- Streamline local checks and make release ZIPs reproducible.
+
 ## 1.1.6
 
-- Manuelle Rollenauswahl je Charakter für Aktionsleisten-Vorlagen. Die bisherige automatische Rollensynchronisierung entfällt.
-- Laden und Überschreiben von Vorlagen benötigen eine Bestätigung.
-- Gemeinsame Rollenvorlagen sichern verwendete Charaktermakros aus Aktionsleisten und nativen Klickzaubern mit ihrem Inhalt.
+- Select an action bar template role manually for each character. Automatic role synchronization has been removed.
+- Loading and overwriting templates require confirmation.
+- Shared role templates include the contents of character macros used by action bars and native click casting.
 
 ## 1.1.5
 

@@ -1,15 +1,10 @@
 # Foreverbuddy
 
-Eigenständiges Forever-Addon, Interface und Version siehe Foreverbuddy.toc.
-Charaktere, Transmog, Meter und Aktionsleisten; keine Tiefen oder Runen.
-Design passend zu Foreverbuddyui. Eigene SavedVariables und /fb-Befehle erhalten.
-Vor und nach Änderungen git status --short und ./tools/check.sh ausführen.
-Diff prüfen; Client-, Kampf- und Taintprüfung bleibt im Forever-Client erforderlich.
-./tools/package.sh erstellt lokale ZIPs ohne Tests oder Entwicklerdokumentation.
-Uploads nur nach Auftrag in das eigene Repository.
+Forever. Einstieg in `Core.lua`, `Initialize.lua` und `Modules/`. Aktionsleisten, Rollenvorlagen, native Klickzauber, Berufspost und `/fb` erhalten.
 
-## Veröffentlichungsziel
-
-- Das öffentliche Repository `norushflow/ForeverBuddy` ist das freigegebene Upload- und Releaseziel.
-- Ein ausdrücklicher Releaseauftrag erlaubt Commit, Push und den zur TOC passenden Versions-Tag. Ohne Release- oder Pushauftrag nur lokal vorbereiten.
-- Nur dieses Addon veröffentlichen; Sammelordner, lokale Archive und SavedVariables bleiben lokal.
+- `git status --short` und TOC zuerst prüfen. Nur relevante Dateien und Tests lesen. Lokale Änderungen erhalten und Diffs prüfen.
+- `./tools/check.sh --quick` für gezielte Iteration, `./tools/check.sh --full` für den Abschluss. Bei Fehlern oder Bedarf `--debug` verwenden.
+- SavedVariables, Migrationen, Slash-Befehle und Addon-Unabhängigkeit erhalten. Secret Values vor Lua-Operationen prüfen und bestehende Guards für Kampf, geschützte und verbotene Frames beibehalten.
+- Keine neuen dauerhaften Ticker, automatischen CVar-Änderungen oder Abhängigkeiten ohne Auftrag. UI, Kampf und Taint im Zielclient prüfen.
+- Release-Ablauf in `DEVELOPMENT.md`. Version, Push, Tag und Veröffentlichung nur nach ausdrücklichem Auftrag. Veröffentlichungsziel `norushflow/ForeverBuddy`.
+- `TEMP/UEBERGABE.md` hält lokal Ziel, Änderungen, Prüfstatus und nächsten Schritt fest.

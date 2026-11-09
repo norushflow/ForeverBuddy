@@ -73,11 +73,10 @@ function Buddy.Toggle()
                 if Buddy.loaded.bars and Buddy.Bars then Buddy.Bars.menuButton=button end
                 button:SetText(Buddy.loaded.bars and Buddy.Bars and Buddy.Bars.RowText and Buddy.Bars.RowText()
                     or L["Aktionsleisten · Modul aus"])
-                button:SetScript("OnClick",function() Buddy.OpenModule(entry) end)
             else
                 button:SetText(entry.name .. ((entry.key=="meters") and L[" ein / aus"] or L[" öffnen"]))
-                button:SetScript("OnClick",function() Buddy.OpenModule(entry) end)
             end
+            button:SetScript("OnClick",function() Buddy.OpenModule(entry) end)
         end
         local hintTop = -83-#Buddy.modules*43
         if barsMenu then
@@ -146,17 +145,4 @@ function Buddy.CreateMinimap()
     end)
     button:SetScript("OnLeave",Buddy.HideTooltip)
     place()
-end
-
--- Install a per-frame callback only while opacity is actually changing.
-function Buddy.FadeTo(frame,target)
-    if not frame or frame.buddyAlphaTarget==target then return end
-    frame.buddyAlphaTarget=target
-    frame:SetScript("OnUpdate",function(self,elapsed)
-        local current=self:GetAlpha()
-        local goal=self.buddyAlphaTarget
-        if math.abs(current-goal)<.003 then
-            self:SetAlpha(goal);self:SetScript("OnUpdate",nil)
-        else self:SetAlpha(current+(goal-current)*math.min(1,elapsed*10)) end
-    end)
 end

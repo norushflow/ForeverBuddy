@@ -35,15 +35,24 @@ local faction='Horde'
 function UnitFactionGroup() return faction end
 function UnitFullName() return 'Main','Family' end
 B.LoadMail(); local openPanel=M.Open; M.Open=function() end
-M.Start(M.groups[1]); assert(sent==0)
-events.OnEvent(nil,'MAIL_SHOW'); faction='Alliance'; M.Start(M.groups[1]); assert(sent==0)
-faction='Horde'; M.Start(M.groups[1]); assert(sent==1 and attached[1] and not attached[2])
+M.Start(M.groups[1]); assert(sent==0 and not events.OnUpdate)
+events.OnEvent(nil,'MAIL_SHOW'); faction='Alliance'; M.Start(M.groups[1]); assert(sent==0 and not events.OnUpdate)
+faction='Horde'; M.Start(M.groups[1]); assert(sent==1 and attached[1] and not attached[2] and events.OnUpdate)
 M.Start(M.groups[1]); assert(sent==1)
-events.OnEvent(nil,'MAIL_FAILED'); events.OnUpdate(nil,2); assert(sent==1)
+events.OnEvent(nil,'MAIL_FAILED'); assert(sent==1 and not events.OnUpdate)
 attached={}; M.Start(M.groups[1]); assert(sent==2)
-items={};attached={};events.OnEvent(nil,'MAIL_SEND_SUCCESS');events.OnUpdate(nil,2);assert(sent==2)
-events.OnEvent(nil,'MAIL_CLOSED');M.Start(M.groups[1]);assert(sent==2)
-print('PASS: mail groups, mailbox guard, bound/locked exclusions, busy guard, failure and completion')
+attached={}; events.OnEvent(nil,'MAIL_SEND_SUCCESS')
+events.OnUpdate(nil,.5); assert(sent==2)
+events.OnUpdate(nil,.5); assert(sent==3)
+items={}; attached={}; events.OnEvent(nil,'MAIL_SEND_SUCCESS')
+events.OnUpdate(nil,1); assert(sent==3 and not events.OnUpdate)
+items={{itemID=1}}; M.Start(M.groups[1]); assert(sent==4)
+events.OnUpdate(nil,16); assert(sent==4 and not events.OnUpdate)
+attached={}; M.Start(M.groups[1]); assert(sent==5)
+events.OnEvent(nil,'PLAYER_REGEN_DISABLED'); assert(sent==5 and not events.OnUpdate)
+attached={}; M.Start(M.groups[1]); assert(sent==6)
+events.OnEvent(nil,'MAIL_CLOSED'); M.Start(M.groups[1]); assert(sent==6 and not events.OnUpdate)
+print('PASS: mail groups, guards, batching, idle cleanup, failure, timeout and completion')
 
 -- Exercise the actual positioning path with an existing panel.
 UIParent={}

@@ -117,15 +117,29 @@ characters.Render();assert(characters.scroll.offset==0 and characters.rows[1]:Is
 Buddy.db.characters.filters.class='WARRIOR'
 characters.Render();assert(characters.empty:IsShown(),'empty filter state')
 characters.clearBtn.scripts.OnClick();assert(not characters.empty:IsShown())
+Buddy.db.characters.chars.alt1.level=2
 characters.headers[6].scripts.OnClick();assert(Buddy.db.characters.sort.key=='level' and Buddy.db.characters.sort.asc)
+assert(characters.rows[1].cells[1].text=='Alt1 Realm' and characters.rows[2].cells[1].text=='Alt2 Realm',
+    'numeric ties keep alphabetical ordering')
+characters.headers[1].scripts.OnClick()
+assert(characters.rows[1].cells[1].text=='Buddy Realm' and characters.rows[2].cells[1].text=='Alt9 Realm',
+    'name sorting keeps descending lexical ordering')
 characters.tab2.scripts.OnClick();assert(characters.headers[1].text.text=='Klasse' and characters.rows[1].cells[1].text=='Magier')
-characters.tab1.scripts.OnClick();assert(characters.headers[1].text.text=='Vor- und Nachname' and characters.scroll.offset==0)
+characters.tab1.scripts.OnClick();assert(characters.headers[1].text.text=='Vor- und Nachname -' and characters.scroll.offset==0)
 print('PASS: character layout, localization, row cap, filtering, empty state, sorting and tabs')
 -- Berufssnapshot: fehlende Login-/Logoutdaten dürfen gespeicherte Berufe nicht löschen.
 local charEvents
 for _,f in ipairs(frames) do if f.events.SKILL_LINES_CHANGED then charEvents=f end end
 assert(charEvents)
 local c=Buddy.db.characters.chars['Realm-Buddy']
+local xpReads, restedReads = 0, 0
+local originalXPMax = UnitXPMax
+function UnitXPMax() xpReads=xpReads+1; return 1000 end
+function GetXPExhaustion() restedReads=restedReads+1; return 123 end
+charEvents.scripts.OnEvent(charEvents,'PLAYER_LOGIN')
+assert(xpReads==1 and restedReads==1 and c.xpmax==1000 and c.rested_xp==123 and c.restxp_pct==12.3,
+    'rested percentage is rounded from a single XP snapshot')
+UnitXPMax, GetXPExhaustion = originalXPMax, nil
 c.prof1_name,c.prof1_lvl='Alchemie',70
 c.prof2_name,c.prof2_lvl='Kräuterkunde',80
 GetProfessions=function() return nil,nil end

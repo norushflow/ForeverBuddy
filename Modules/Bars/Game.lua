@@ -40,15 +40,15 @@ function B.Settable(slot)
 end
 
 -- Speichern und Laden nur außerhalb von Kampf und Sonderleisten.
+local specialBarChecks = {"HasVehicleActionBar","HasOverrideActionBar","HasTempShapeshiftActionBar",
+    "HasPossessBar","HasBonusActionBar"}
 function B.Reason()
     if B.Call(InCombatLockdown)~=false then return L["Wartet auf Kampfende"] end
-    for _,name in ipairs({"HasVehicleActionBar","HasOverrideActionBar","HasTempShapeshiftActionBar",
-        "HasPossessBar","HasBonusActionBar"}) do
+    for _,name in ipairs(specialBarChecks) do
         local check=_G[name]
         if type(check)=="function" and B.Call(check)==true then return L["Sonderleiste aktiv"] end
     end
 end
-function B.Blocked() return B.Reason() end
 function B.CursorFree()
     if type(GetCursorInfo)~="function" then return false end
     local ok,cursor=pcall(GetCursorInfo)
