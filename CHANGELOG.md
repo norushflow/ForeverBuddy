@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.4
+
+- Deutsche und englische Sprachdateien mit gemeinsamer Codebasis; `enUS`/`enGB` und Englisch als Fallback für weitere Sprachen.
+- Die Zentrale schließt beim Aufrufen eines Moduls; Aktionsleisten behalten das Menü offen.
+- Bei aktivem ForeverBuddyUI übernimmt dessen charakterbezogene Sicherung die Automatik, damit die alte Klassenvorlage nicht beim Login darübergeschrieben wird. Manuelles Speichern/Laden bleibt verfügbar.
+
 ## 1.1.3
 
 - CurseForge-Projekt-ID und Paketkonfiguration ergänzt.

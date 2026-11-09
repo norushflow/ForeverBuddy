@@ -1,4 +1,4 @@
-# ForeverBuddy 1.1.3
+# ForeverBuddy 1.1.4
 
 <p align="center"><img src="branding/icon-400.png" alt="ForeverBuddy" width="160" height="160"></p>
 
@@ -12,6 +12,13 @@ Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, A
 - Dungeon-Transmog und eigene Schadens-/Heilungsanzeige.
 - Leistenvorlagen je Klasse einschließlich nativer Klickzauberbelegung.
 - Berufspost mit neun Materialgruppen und getrennten Empfängern für Horde und Allianz.
+
+## Sprachen und aktueller Stand
+
+Die Spielsprache bestimmt die Texte: Deutsch (`deDE`), Englisch (`enUS`, `enGB`), sonst Englisch. Die gemeinsame Codebasis lädt `Locales/enUS.lua` und anschließend die deutschen Übersetzungen. Namen aus Blizzard-APIs (z. B. Gegenstände, Zauber und Klassen) folgen weiterhin der Clientsprache.
+
+- Die Zentrale schließt beim Aufrufen eines Moduls; Aktionsleisten behalten das Menü offen.
+- Bei aktivem ForeverBuddyUI übernimmt dessen charakterbezogene Sicherung die Automatik, damit die alte Klassenvorlage nicht beim Login darübergeschrieben wird. Manuelles Speichern/Laden bleibt verfügbar.
 
 ## Installation
 

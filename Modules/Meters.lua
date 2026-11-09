@@ -1,4 +1,5 @@
 local _, Buddy = ...
+local L = Buddy.L
 local M={windows={}, generation=0}
 Buddy.Meters=M
 local ROWS=5
@@ -29,12 +30,12 @@ function M.Clear(window,message)
 end
 function M.Paint(window,session)
     if not record(session) or not record(session.combatSources) then
-        M.Clear(window,"Daten derzeit nicht verfügbar");return
+        M.Clear(window,L["Daten derzeit nicht verfügbar"]);return
     end
     local sources=session.combatSources
     local count=#sources
     window.offset=math.max(0,math.min(window.offset,math.max(0,count-ROWS)))
-    if count==0 then M.Clear(window,"Noch keine Kampfdaten");return end
+    if count==0 then M.Clear(window,L["Noch keine Kampfdaten"]);return end
     window.note:Hide()
     local maximum=widgetNumber(session.maxAmount)
     if number(maximum) and maximum<=0 then maximum=1 end
@@ -61,14 +62,14 @@ end
 function M.Refresh()
     if not shown() then return end
     if not available() then
-        for _,w in ipairs(M.windows) do M.Clear(w,"Schadensdaten-API nicht verfügbar") end
+        for _,w in ipairs(M.windows) do M.Clear(w,L["Schadensdaten-API nicht verfügbar"]) end
         return
     end
     local sessionType=M.db.overall and Enum.DamageMeterSessionType.Overall or Enum.DamageMeterSessionType.Current
     for _,w in ipairs(M.windows) do
-        w.segment:SetText(M.db.overall and "Gesamt" or "Aktuell")
+        w.segment:SetText(M.db.overall and L["Gesamt"] or L["Aktuell"])
         local ok,data=pcall(C_DamageMeter.GetCombatSessionFromType,sessionType,w.kind)
-        if ok then M.Paint(w,data) else M.Clear(w,"Daten derzeit nicht verfügbar") end
+        if ok then M.Paint(w,data) else M.Clear(w,L["Daten derzeit nicht verfügbar"]) end
     end
 end
 function M.Schedule()
@@ -88,7 +89,7 @@ local function font(parent,template)
 end
 function M.Create()
     if M.windows[1] then return end
-    for index,title in ipairs({"Schaden","Heilung"}) do
+    for index,title in ipairs({L["Schaden"],L["Heilung"]}) do
         local w=CreateFrame("Frame","ForeverbuddyMeter"..index,UIParent,"BackdropTemplate")
         M.windows[index]=w;w:Hide();w:SetSize(260,195)
         w:SetPoint("BOTTOMRIGHT",UIParent,"BOTTOMRIGHT",index==1 and -272 or -2,47)
@@ -143,25 +144,25 @@ function M.SyncVisibility(silent)
         -- Modul als aus. Sonst würde der nächste /fb meter ausschalten statt einschalten.
         if active and native==true then
             M.db.active=false
-            if not silent then report("Blizzards Anzeige ist wieder aktiv; /fb meter schaltet sie erneut aus.") end
+            if not silent then report(L["Blizzards Anzeige ist wieder aktiv; /fb meter schaltet sie erneut aus."]) end
         end
     end
 end
 function M.Toggle()
-    if InCombatLockdown() then report("Bitte zum Umschalten das Kampfende abwarten.");return end
-    if not available() then report("Blizzards Schadensdaten-API ist nicht verfügbar.");return end
+    if InCombatLockdown() then report(L["Bitte zum Umschalten das Kampfende abwarten."]);return end
+    if not available() then report(L["Blizzards Schadensdaten-API ist nicht verfügbar."]);return end
     if not C_CVar or type(C_CVar.SetCVar)~="function" or nativeEnabled()==nil then
-        report("Blizzard-Systemeinstellung nicht verfügbar.");return
+        report(L["Blizzard-Systemeinstellung nicht verfügbar."]);return
     end
     local target=not M.db.active
     -- Wie bei EUI: eigene Fenster, Blizzards Daten-API bleibt bei ausgeschalteter nativer UI nutzbar.
     -- Nur diese ausdrückliche Bedienung darf die native Anzeige ausschalten.
     local ok=pcall(C_CVar.SetCVar,"damageMeterEnabled","0")
-    if not ok or nativeEnabled()~=false then report("Blizzard hat die Änderung nicht übernommen.");return end
+    if not ok or nativeEnabled()~=false then report(L["Blizzard hat die Änderung nicht übernommen."]);return end
     M.db.active=target
     M.SyncVisibility()
-    report(target and "Schaden und Heilung eingeschaltet: unten rechts. Mausrad: weitere Spieler."
-        or "Schaden und Heilung ausgeschaltet.")
+    report(target and L["Schaden und Heilung eingeschaltet: unten rechts. Mausrad: weitere Spieler."]
+        or L["Schaden und Heilung ausgeschaltet."])
 end
 function Buddy.LoadMeters()
     M.db=Buddy.db.meters;M.db.arrange=nil

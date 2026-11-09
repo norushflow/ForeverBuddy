@@ -1,4 +1,5 @@
 local addonName, Buddy = ...
+local L = Buddy.L
 function Buddy.LoadCharacters()
 local AltMiniDB = Buddy.db.characters
 -- Account character snapshots and overview.
@@ -278,15 +279,15 @@ end
 local ui
 
 local COLS = {
-{ key="name",         title="Vor- und Nachname", w=250 },
-{ key="class",        title="Klasse",    w=110 },
-{ key="faction",      title="Fraktion",  w=90  },
-{ key="prof1",        title="Beruf 1",   w=180 },
-{ key="prof2",        title="Beruf 2",   w=180 },
+{ key="name",         title=L["Vor- und Nachname"], w=250 },
+{ key="class",        title=L["Klasse"],    w=110 },
+{ key="faction",      title=L["Fraktion"],  w=90  },
+{ key="prof1",        title=L["Beruf 1"],   w=180 },
+{ key="prof2",        title=L["Beruf 2"],   w=180 },
 { key="level",        title="Lvl",       w=55  },
 { key="ilvl",         title="iLvl",      w=65  },
-{ key="restxp_pct",   title="Erholt %",    w=80  },
-{ key="playtime_sec", title="Spielzeit",  w=110 },
+{ key="restxp_pct",   title=L["Erholt %"],    w=80  },
+{ key="playtime_sec", title=L["Spielzeit"],  w=110 },
 }
 
 local function GetCellValueForSort(c, key)
@@ -364,7 +365,7 @@ b:SetScript("OnEnter", function(self)
  Buddy.Foreign(GameTooltip, function()
  GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
  GameTooltip:AddLine(self.profName or (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[self.classTag]) or self.classTag or "Filter")
- GameTooltip:AddLine("Klicken zum Filtern; erneut klicken zum Aufheben",0.7,0.75,0.8)
+ GameTooltip:AddLine(L["Klicken zum Filtern; erneut klicken zum Aufheben"],0.7,0.75,0.8)
  GameTooltip:Show()
  end)
 end)
@@ -417,12 +418,12 @@ accent:SetPoint("TOPLEFT", 0, 0); accent:SetPoint("TOPRIGHT", 0, 0); accent:SetH
 local logo = ui:CreateTexture(nil, "ARTWORK")
 logo:SetTexture(LOGO_PATH); logo:SetSize(38,38); logo:SetPoint("TOPLEFT",20,-16)
 local subtitle = MakeFS(ui)
-subtitle:SetPoint("TOPLEFT",70,-42); subtitle:SetText("Deine Charaktere auf einen Blick")
+subtitle:SetPoint("TOPLEFT",70,-42); subtitle:SetText(L["Deine Charaktere auf einen Blick"])
 subtitle:SetTextColor(0.62,0.69,0.73)
 ui.summary = MakeFS(ui)
 ui.summary:SetPoint("BOTTOMLEFT",24,16); ui.summary:SetTextColor(0.62,0.69,0.73)
 ui.empty = MakeFS(ui)
-ui.empty:SetPoint("TOP",0,-LIST_TOP-40); ui.empty:SetText("Keine Charaktere für diese Filter gefunden.")
+ui.empty:SetPoint("TOP",0,-LIST_TOP-40); ui.empty:SetText(L["Keine Charaktere für diese Filter gefunden."])
 ui.empty:SetTextColor(0.62,0.69,0.73); ui.empty:Hide()
 UISpecialFrames[#UISpecialFrames+1] = "ForeverbuddyCharactersFrame"
 
@@ -439,14 +440,14 @@ ui.tab1 = Buddy.Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTempla
 ui.tab1:SetSize(140, 30)
 StyleTab(ui.tab1)
 ui.tab1:SetPoint("TOPLEFT", 20, -65)
-ui.tab1:SetText("Übersicht")
+ui.tab1:SetText(L["Übersicht"])
 ui.tab1:SetScript("OnClick", function() CURRENT_TAB = 1; FauxScrollFrame_SetOffset(ui.scroll, 0); if ui.Render then ui.Render() end end)
 
 ui.tab2 = Buddy.Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTemplate"))
 ui.tab2:SetSize(180, 30)
 StyleTab(ui.tab2)
 ui.tab2:SetPoint("LEFT", ui.tab1, "RIGHT", 5, 0)
-ui.tab2:SetText("Klassen-Statistik")
+ui.tab2:SetText(L["Klassen-Statistik"])
 ui.tab2:SetScript("OnClick", function() CURRENT_TAB = 2; FauxScrollFrame_SetOffset(ui.scroll, 0); if ui.Render then ui.Render() end end)
 
 -- Title
@@ -454,14 +455,14 @@ ui.title = MakeFS(ui)
 ui.title:SetPoint("TOPLEFT", 70, -19)
 ui.title:SetFont(FONT_PATH, 18, "")
 ui.title:SetTextColor(.78,.78,.78)
-ui.title:SetText("ForeverBuddy · Charaktere")
+ui.title:SetText(L["ForeverBuddy · Charaktere"])
 
 -- Account Playtime (top-right)
 ui.accountPlaytime = MakeFS(ui)
 ui.accountPlaytime:SetPoint("TOPRIGHT", -58, -22)
 ui.accountPlaytime:SetTextColor(0.76,0.81,0.83)
 ui.accountPlaytime:SetJustifyH("RIGHT")
-ui.accountPlaytime:SetText("Erfasste Spielzeit: 0d 0h 0m")
+ui.accountPlaytime:SetText(L["Erfasste Spielzeit: 0d 0h 0m"])
 
 local close = CreateFrame("Button", nil, ui, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", -4, -4)
@@ -469,7 +470,7 @@ close:SetPoint("TOPRIGHT", -4, -4)
 local refresh = Buddy.Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTemplate"))
 refresh:SetSize(110, 24)
 refresh:SetPoint("TOPRIGHT", -24, -66)
-refresh:SetText("Aktualisieren")
+refresh:SetText(L["Aktualisieren"])
 
 -- Filter bar background
 local filterBg = CreateFrame("Frame", nil, ui, "BackdropTemplate")
@@ -482,7 +483,7 @@ Buddy.Style.Inset(filterBg)
 ui.clearBtn = Buddy.Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTemplate"))
 ui.clearBtn:SetSize(145, 24)
 ui.clearBtn:SetPoint("TOPRIGHT", -32, -106)
-ui.clearBtn:SetText("Filter zurücksetzen")
+ui.clearBtn:SetText(L["Filter zurücksetzen"])
 ui.clearBtn:SetScript("OnClick", function()
 local flt = EnsureFilters()
 flt.class, flt.prof = nil, nil
@@ -673,8 +674,8 @@ end
 if not flt.class and not flt.prof then return nil end
 
 local parts = {}
-if flt.class then table.insert(parts, "Klasse=" .. flt.class) end
-if flt.prof  then table.insert(parts, "Beruf=" .. flt.prof) end
+if flt.class then table.insert(parts, L["Klasse="] .. flt.class) end
+if flt.prof  then table.insert(parts, L["Beruf="] .. flt.prof) end
 return " (" .. table.concat(parts, " | ") .. ")"
 end
 
@@ -686,7 +687,7 @@ for index, tab in ipairs({ui.tab1,ui.tab2}) do
     tab.fill:SetColorTexture(0.65,0.5,0.2,selected and .15 or 0)
     tab:GetFontString():SetTextColor(selected and .9 or 0.65,selected and .9 or 0.71,selected and .9 or 0.74)
 end
-ui.accountPlaytime:SetText("Erfasste Spielzeit: " .. SecToDHM(GetAccountPlaytimeSeconds()))
+ui.accountPlaytime:SetText(L["Erfasste Spielzeit: "] .. SecToDHM(GetAccountPlaytimeSeconds()))
 
 if CURRENT_TAB == 1 then
 -- Show Overview elements
@@ -716,7 +717,7 @@ local data = BuildSortedList()
 local total = #data
 local rowsVisible = math.max(5, math.min(LIST_ROWS, total))
 ui:SetHeight(LIST_TOP + rowsVisible * ROW_H + 44)
-ui.summary:SetText(total .. " Charaktere · Spaltenüberschrift zum Sortieren anklicken")
+ui.summary:SetText(total .. L[" Charaktere · Spaltenüberschrift zum Sortieren anklicken"])
 ui.empty:SetShown(total == 0)
 for i=rowsVisible+1,#ui.rows do ui.rows[i]:Hide() end
 FauxScrollFrame_Update(sf, total, rowsVisible, ROW_H)
@@ -789,14 +790,14 @@ for _, b in ipairs(ui.classButtons) do b:Hide() end
 for _, b in ipairs(ui.profButtons) do b:Hide() end
 for i, b in ipairs(ui.headers) do
  b:SetShown(i <= 2)
- b.text:SetText(i == 1 and "Klasse" or "Spielzeit")
+ b.text:SetText(i == 1 and L["Klasse"] or L["Spielzeit"])
 end
 
 local stats = GetClassStats()
 local total = #stats
 local rowsVisible = math.max(5, math.min(LIST_ROWS, total))
 ui:SetHeight(LIST_TOP + rowsVisible * ROW_H + 44)
-ui.summary:SetText(total .. " Klassen · Erfasste Spielzeit pro Klasse")
+ui.summary:SetText(total .. L[" Klassen · Erfasste Spielzeit pro Klasse"])
 ui.empty:SetShown(total == 0)
 for i=rowsVisible+1,#ui.rows do ui.rows[i]:Hide() end
 FauxScrollFrame_Update(sf, total, rowsVisible, ROW_H)

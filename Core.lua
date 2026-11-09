@@ -1,10 +1,11 @@
 local addonName, Buddy = ...
+local L = Buddy.L
 Buddy.modules = {
-    {key="characters", name="Charaktere", loader="LoadCharacters", command="FOREVERBUDDYCHARS"},
-    {key="transmog", name="Dungeon-Transmog", loader="LoadTransmog", command="FOREVERBUDDYTRANSMOG"},
-    {key="meters", name="Schaden und Heilung", loader="LoadMeters", command="FOREVERBUDDYMETERS"},
-    {key="bars", name="Aktionsleisten", loader="LoadBars", command="FOREVERBUDDYBARS", argument="status"},
-    {key="mail", name="Berufspost", loader="LoadMail", command="FOREVERBUDDYMAIL"},
+    {key="characters", name=L["Charaktere"], loader="LoadCharacters", command="FOREVERBUDDYCHARS"},
+    {key="transmog", name=L["Dungeon-Transmog"], loader="LoadTransmog", command="FOREVERBUDDYTRANSMOG"},
+    {key="meters", name=L["Schaden und Heilung"], loader="LoadMeters", command="FOREVERBUDDYMETERS"},
+    {key="bars", name=L["Aktionsleisten"], loader="LoadBars", command="FOREVERBUDDYBARS", argument="status"},
+    {key="mail", name=L["Berufspost"], loader="LoadMail", command="FOREVERBUDDYMAIL"},
 }
 function Buddy.Foreign(frame, action)
     if (issecretvalue and issecretvalue(frame)) or not frame then return false end
@@ -19,14 +20,17 @@ function Buddy.HideTooltip()
 end
 function Buddy.Message(text) print("|cffd0d0d0ForeverBuddy:|r " .. text) end
 function Buddy.OpenModule(module)
-    if not Buddy.loaded[module.key] then Buddy.Message("Modul aktivieren und die Oberfläche neu laden."); return end
+    if module.key ~= "bars" and Buddy.panel then Buddy.panel:Hide() end
+    if not Buddy.loaded[module.key] then Buddy.Message(L["Modul aktivieren und die Oberfläche neu laden."]); return end
     if module.key == "bars" then
         if Buddy.Bars and Buddy.Bars.SetAutomatic then
             Buddy.Bars.SetAutomatic(not Buddy.db.bars.automatic)
         end
     else
         local handler = SlashCmdList[module.command]
-        if handler then handler(module.argument or "") end
+        if handler then
+            handler(module.argument or "")
+        end
     end
 end
 function Buddy.Toggle()
@@ -51,7 +55,7 @@ function Buddy.Toggle()
         local title = panel:CreateFontString(nil,"OVERLAY","GameFontNormalLarge")
         title:SetPoint("TOPLEFT",68,-21); title:SetText("ForeverBuddy")
         local sub = panel:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall")
-        sub:SetPoint("TOPLEFT",68,-44); sub:SetText("Dein Begleiter in Forever")
+        sub:SetPoint("TOPLEFT",68,-44); sub:SetText(L["Dein Begleiter in Forever"])
         local close = CreateFrame("Button",nil,panel,"UIPanelCloseButton")
         close:SetPoint("TOPRIGHT",-3,-3)
         for index,module in ipairs(Buddy.modules) do
@@ -61,17 +65,17 @@ function Buddy.Toggle()
             check:SetChecked(Buddy.db.enabled[entry.key])
             check:SetScript("OnClick",function(self)
                 Buddy.db.enabled[entry.key] = self:GetChecked() and true or false
-                Buddy.Message("Modulauswahl gespeichert. Mit /reload anwenden.")
+                Buddy.Message(L["Modulauswahl gespeichert. Mit /reload anwenden."])
             end)
             local button = Buddy.Style.Button(CreateFrame("Button",nil,panel,"UIPanelButtonTemplate"))
             button:SetSize(312,30); button:SetPoint("TOPLEFT",55,-76-(index-1)*43)
             if entry.key=="bars" then
                 if Buddy.loaded.bars and Buddy.Bars then Buddy.Bars.menuButton=button end
                 button:SetText(Buddy.loaded.bars and Buddy.Bars and Buddy.Bars.RowText and Buddy.Bars.RowText()
-                    or "Aktionsleisten · Modul aus")
+                    or L["Aktionsleisten · Modul aus"])
                 button:SetScript("OnClick",function() Buddy.OpenModule(entry) end)
             else
-                button:SetText(entry.name .. ((entry.key=="meters") and " ein / aus" or " öffnen"))
+                button:SetText(entry.name .. ((entry.key=="meters") and L[" ein / aus"] or L[" öffnen"]))
                 button:SetScript("OnClick",function() Buddy.OpenModule(entry) end)
             end
         end
@@ -82,12 +86,12 @@ function Buddy.Toggle()
         end
         local hint = panel:CreateFontString(nil,"OVERLAY","GameFontDisableSmall")
         hint:SetPoint("TOPLEFT",22,hintTop); hint:SetWidth(346)
-        hint:SetText("Häkchen: Modul beim Start laden. Änderungen mit /reload anwenden. Aktionsleisten-Vorlagen gelten je Klasse und Spezialisierung.")
+        hint:SetText(L["Häkchen: Modul beim Start laden. Änderungen mit /reload anwenden. Aktionsleisten-Vorlagen gelten je Klasse und Spezialisierung."])
         local reload = Buddy.Style.Button(CreateFrame("Button",nil,panel,"UIPanelButtonTemplate"))
         reload:SetSize(200,24); reload:SetPoint("BOTTOM",0,12)
-        reload:SetText("Oberfläche neu laden")
+        reload:SetText(L["Oberfläche neu laden"])
         reload:SetScript("OnClick",function()
-            if InCombatLockdown() then Buddy.Message("Bitte das Kampfende abwarten."); return end
+            if InCombatLockdown() then Buddy.Message(L["Bitte das Kampfende abwarten."]); return end
             ReloadUI()
         end)
         UISpecialFrames[#UISpecialFrames+1] = "ForeverbuddyPanel"
@@ -134,9 +138,9 @@ function Buddy.CreateMinimap()
         Buddy.Foreign(GameTooltip, function()
         GameTooltip:SetOwner(self,"ANCHOR_LEFT")
         GameTooltip:AddLine("ForeverBuddy",.78,.78,.78)
-        GameTooltip:AddLine("Linksklick: Zentrale",1,1,1)
-        GameTooltip:AddLine("Rechtsklick: Charaktere",1,1,1)
-        GameTooltip:AddLine("Ziehen: Position ändern",.7,.7,.7)
+        GameTooltip:AddLine(L["Linksklick: Zentrale"],1,1,1)
+        GameTooltip:AddLine(L["Rechtsklick: Charaktere"],1,1,1)
+        GameTooltip:AddLine(L["Ziehen: Position ändern"],.7,.7,.7)
         GameTooltip:Show()
         end)
     end)

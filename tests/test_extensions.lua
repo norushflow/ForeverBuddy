@@ -1,3 +1,4 @@
+local loadfile = dofile("tests/load_locales.lua")
 -- Vertrags-/Zustandstests; keine echte Blizzard- oder Taint-Simulation.
 local B={db={meters={}}}
 local queue,frames={},{}

@@ -1,4 +1,5 @@
 local _, Buddy = ...
+local L = Buddy.L
 local B = {}; Buddy.Bars = B
 
 -- Geschützte Werte niemals indexieren, vergleichen oder formatieren.
@@ -45,11 +46,11 @@ end
 
 -- Speichern und Laden nur außerhalb von Kampf und Sonderleisten.
 function B.Reason()
-    if B.Call(InCombatLockdown)~=false then return "Wartet auf Kampfende" end
+    if B.Call(InCombatLockdown)~=false then return L["Wartet auf Kampfende"] end
     for _,name in ipairs({"HasVehicleActionBar","HasOverrideActionBar","HasTempShapeshiftActionBar",
         "HasPossessBar","HasBonusActionBar"}) do
         local check=_G[name]
-        if type(check)=="function" and B.Call(check)==true then return "Sonderleiste aktiv" end
+        if type(check)=="function" and B.Call(check)==true then return L["Sonderleiste aktiv"] end
     end
 end
 function B.Blocked() return B.Reason() end
@@ -108,24 +109,24 @@ local function macroName(index)
 end
 
 function B.Read(slot)
-    if type(GetActionInfo)~="function" then return nil,"API fehlt" end
+    if type(GetActionInfo)~="function" then return nil,L["API fehlt"] end
     local ok,kind,id=pcall(GetActionInfo,slot)
-    if not ok then return nil,"Abfrage fehlgeschlagen" end
-    if not B.Public(kind) or not B.Public(id) then return nil,"geschützter Wert" end
+    if not ok then return nil,L["Abfrage fehlgeschlagen"] end
+    if not B.Public(kind) or not B.Public(id) then return nil,L["geschützter Wert"] end
     if kind==nil then return {action="empty"} end
     if kind=="spell" or kind=="item" or kind=="flyout" then
         if B.Number(id) and id>0 then return {action=kind,value=id} end
-        return nil,"ungültige Kennung"
+        return nil,L["ungültige Kennung"]
     elseif kind=="macro" then
-        if not B.Number(id) then return nil,"Makro ungültig" end
+        if not B.Number(id) then return nil,L["Makro ungültig"] end
         local scope=B.MacroScope(id)
         -- Accountweite Makros werden vollständig ignoriert: kein Speichern,
         -- kein Wiederherstellen und keine Meldung als fehlendes Makro.
         if scope=="account" then return {action="ignored"} end
-        if scope~="character" then return nil,"Makro nicht gefunden" end
+        if scope~="character" then return nil,L["Makro nicht gefunden"] end
         local name=macroName(id)
         if B.Text(name) then return {action="macro",value=name} end
-        return nil,"Makro nicht gefunden"
+        return nil,L["Makro nicht gefunden"]
     elseif kind=="equipmentset" then
         local name
         if B.Text(id) then name=id
@@ -134,7 +135,7 @@ function B.Read(slot)
             if B.Text(infoName) then name=infoName end
         end
         if name then return {action="equipmentset",value=name} end
-        return nil,"Ausrüstungsset nicht gefunden"
+        return nil,L["Ausrüstungsset nicht gefunden"]
     else
         -- Unbekannte Typen niemals als leer speichern und beim Laden überspringen.
         return {action="keep"}

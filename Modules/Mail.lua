@@ -1,17 +1,18 @@
 local _, Buddy = ...
+local L = Buddy.L
 local M = {}
 Buddy.Mail = M
 -- Trade-goods subclasses; overlapping materials go only to the selected profession.
 M.groups = {
-    {"alchemy", "Alchemie", {[9]=true}},
-    {"inscription", "Inschriftenkunde", {[9]=true,[16]=true}},
-    {"blacksmith", "Schmiedekunst", {[7]=true}},
-    {"engineering", "Ingenieurskunst", {[7]=true,[1]=true}},
-    {"jewelcrafting", "Juwelierskunst", {[4]=true,[7]=true}},
-    {"leatherworking", "Lederverarbeitung", {[6]=true}},
-    {"tailoring", "Schneiderei", {[5]=true}},
-    {"enchanting", "Verzauberkunst", {[12]=true}},
-    {"cooking", "Kochkunst", {[8]=true}},
+    {"alchemy", L["Alchemie"], {[9]=true}},
+    {"inscription", L["Inschriftenkunde"], {[9]=true,[16]=true}},
+    {"blacksmith", L["Schmiedekunst"], {[7]=true}},
+    {"engineering", L["Ingenieurskunst"], {[7]=true,[1]=true}},
+    {"jewelcrafting", L["Juwelierskunst"], {[4]=true,[7]=true}},
+    {"leatherworking", L["Lederverarbeitung"], {[6]=true}},
+    {"tailoring", L["Schneiderei"], {[5]=true}},
+    {"enchanting", L["Verzauberkunst"], {[12]=true}},
+    {"cooking", L["Kochkunst"], {[8]=true}},
 }
 function M.Matches(group, class, subclass)
     return class == 7 and group[3][subclass] == true
@@ -57,11 +58,11 @@ function Buddy.LoadMail()
         return not occupied() and (GetSendMailMoney() or 0)==0 and (GetSendMailCOD() or 0)==0
     end
     local function batch()
-        if not opened or InCombatLockdown() then stop("Versand beendet: Mailbox geschlossen oder Kampf."); return end
-        if not clean() or GetCursorInfo() then stop("Bitte den Briefentwurf und den Mauszeiger zuerst leeren."); return end
+        if not opened or InCombatLockdown() then stop(L["Versand beendet: Mailbox geschlossen oder Kampf."]); return end
+        if not clean() or GetCursorInfo() then stop(L["Bitte den Briefentwurf und den Mauszeiger zuerst leeren."]); return end
         if not ((C_Item and (C_Item.GetItemInfoInstant or C_Item.GetItemInfo))
             or GetItemInfoInstant or GetItemInfo) then
-            stop("Gegenstandsdaten sind in diesem Client nicht verfügbar."); return
+            stop(L["Gegenstandsdaten sind in diesem Client nicht verfügbar."]); return
         end
         local n=0
         for bag=0,(NUM_BAG_SLOTS or 4) do
@@ -72,8 +73,8 @@ function Buddy.LoadMail()
                     if M.Matches(active.group,class,subclass) then
                         C.PickupContainerItem(bag,slot)
                         ClickSendMailItemButton(n+1)
-                        if GetCursorInfo() then ClearCursor(); stop("Anhang konnte nicht hinzugefügt werden."); return end
-                        if not GetSendMailItem(n+1) then stop("Anhang nicht bestätigt. Bitte Brief prüfen."); return end
+                        if GetCursorInfo() then ClearCursor(); stop(L["Anhang konnte nicht hinzugefügt werden."]); return end
+                        if not GetSendMailItem(n+1) then stop(L["Anhang nicht bestätigt. Bitte Brief prüfen."]); return end
                         n=n+1
                         if n >= (ATTACHMENTS_MAX_SEND or 12) then break end
                     end
@@ -81,28 +82,28 @@ function Buddy.LoadMail()
             end
             if n >= (ATTACHMENTS_MAX_SEND or 12) then break end
         end
-        if n==0 then stop("Versand abgeschlossen. Keine weiteren passenden, versendbaren Materialien gefunden."); return end
-        if GetMoney() < n*30 then stop("Nicht genügend Gold für das Porto. Anhänge bleiben im Entwurf."); return end
+        if n==0 then stop(L["Versand abgeschlossen. Keine weiteren passenden, versendbaren Materialien gefunden."]); return end
+        if GetMoney() < n*30 then stop(L["Nicht genügend Gold für das Porto. Anhänge bleiben im Entwurf."]); return end
         pending,timeout=true,0
-        SendMail(active.recipient,"Materialien: "..active.group[2],"Gesendet mit ForeverBuddy")
+        SendMail(active.recipient,L["Materialien: "]..active.group[2],L["Gesendet mit ForeverBuddy"])
     end
     function M.Start(group)
-        if active then note("Versand läuft bereits."); return end
-        if not opened then note("Bitte zuerst eine Mailbox öffnen."); return end
-        if not C or not C.GetContainerItemInfo then note("Die Taschen-Schnittstelle ist nicht verfügbar."); return end
+        if active then note(L["Versand läuft bereits."]); return end
+        if not opened then note(L["Bitte zuerst eine Mailbox öffnen."]); return end
+        if not C or not C.GetContainerItemInfo then note(L["Die Taschen-Schnittstelle ist nicht verfügbar."]); return end
         local list=recipients()
-        if not list then note("Bitte zuerst eine Fraktion wählen."); return end
+        if not list then note(L["Bitte zuerst eine Fraktion wählen."]); return end
         local recipient=(list[group[1]] or ""):match("^%s*(.-)%s*$")
-        if recipient=="" then note("Bitte einen Empfänger für "..group[2].." eintragen."); return end
+        if recipient=="" then note(L["Bitte einen Empfänger für "]..group[2]..L[" eintragen."]); return end
         local first,last=UnitFullName("player")
         local ownName=(first or UnitName("player") or "")..(last and last~="" and (" "..last) or "")
-        if recipient:lower()==ownName:lower() then note("Bitte einen anderen Charakter als Empfänger wählen."); return end
+        if recipient:lower()==ownName:lower() then note(L["Bitte einen anderen Charakter als Empfänger wählen."]); return end
         active={group=group,recipient=recipient}
         batch()
     end
     function M.Open()
         local list, faction=recipients()
-        if not list then note("Bitte zuerst eine Fraktion wählen."); return end
+        if not list then note(L["Bitte zuerst eine Fraktion wählen."]); return end
         if not M.panel then
             local p=CreateFrame("Frame","ForeverbuddyMailPanel",UIParent,"BackdropTemplate")
             M.panel=p
@@ -117,9 +118,9 @@ function Buddy.LoadMail()
                 insets={left=11,right=12,top=12,bottom=11}})
             p:SetBackdropColor(1,1,1,1)
             local title=p:CreateFontString(nil,"OVERLAY","GameFontNormalLarge")
-            title:SetPoint("TOPLEFT",18,-18); title:SetText("Berufspost · "..(faction=="Alliance" and "Allianz" or "Horde"))
+            title:SetPoint("TOPLEFT",18,-18); title:SetText(L["Berufspost · "]..(faction=="Alliance" and L["Allianz"] or "Horde"))
             local hint=p:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall")
-            hint:SetPoint("TOPLEFT",18,-43); hint:SetWidth(464); hint:SetJustifyH("LEFT"); hint:SetText("Vorname Nachname · Empfänger gelten nur für diese Fraktion.")
+            hint:SetPoint("TOPLEFT",18,-43); hint:SetWidth(464); hint:SetJustifyH("LEFT"); hint:SetText(L["Vorname Nachname · Empfänger gelten nur für diese Fraktion."])
             local close=CreateFrame("Button",nil,p,"UIPanelCloseButton"); close:SetPoint("TOPRIGHT",-3,-3)
             for index,group in ipairs(M.groups) do
                 local g=group
@@ -133,12 +134,12 @@ function Buddy.LoadMail()
                 edit:SetScript("OnEnterPressed",function(self) self:ClearFocus() end)
                 edit:SetScript("OnEscapePressed",function(self) self:ClearFocus() end)
                 local send=CreateFrame("Button",nil,p,"UIPanelButtonTemplate")
-                send:SetSize(85,26); send:SetPoint("TOPLEFT",395,y); send:SetText("Senden")
+                send:SetSize(85,26); send:SetPoint("TOPLEFT",395,y); send:SetText(L["Senden"])
                 send:SetScript("OnClick",function() edit:ClearFocus(); M.Start(g) end)
             end
             local cancel=CreateFrame("Button",nil,p,"UIPanelButtonTemplate")
-            cancel:SetSize(180,26); cancel:SetPoint("BOTTOM",0,15); cancel:SetText("Versand stoppen")
-            cancel:SetScript("OnClick",function() stop("Weitere Briefe gestoppt. Ein bereits gesendeter Brief bleibt versendet.") end)
+            cancel:SetSize(180,26); cancel:SetPoint("BOTTOM",0,15); cancel:SetText(L["Versand stoppen"])
+            cancel:SetScript("OnClick",function() stop(L["Weitere Briefe gestoppt. Ein bereits gesendeter Brief bleibt versendet."]) end)
             UISpecialFrames[#UISpecialFrames+1]="ForeverbuddyMailPanel"
         end
         local p=M.panel
@@ -168,11 +169,11 @@ function Buddy.LoadMail()
         elseif event=="PLAYER_REGEN_DISABLED" then stop()
         elseif active and pending then
             if event=="MAIL_SEND_SUCCESS" then pending=nil; timeout=nil; delay=0
-            elseif event=="MAIL_FAILED" then stop("Versand fehlgeschlagen. Bitte Empfänger und Brief prüfen.") end
+            elseif event=="MAIL_FAILED" then stop(L["Versand fehlgeschlagen. Bitte Empfänger und Brief prüfen."]) end
         end
     end)
     events:SetScript("OnUpdate",function(_,elapsed)
-        if timeout then timeout=timeout+elapsed; if timeout>15 then stop("Keine Versandbestätigung. Bitte Mailbox prüfen; kein automatischer Wiederholungsversuch.") end end
+        if timeout then timeout=timeout+elapsed; if timeout>15 then stop(L["Keine Versandbestätigung. Bitte Mailbox prüfen; kein automatischer Wiederholungsversuch."]) end end
         if delay then delay=delay+elapsed; if delay>=1 then delay=nil; if active then batch() end end end
     end)
     SLASH_FOREVERBUDDYMAIL1="/fbmail"

@@ -1,3 +1,4 @@
+local loadfile = dofile("tests/load_locales.lua")
 local B={db={meters={}},Message=function() end}
 local messages=0;B.Message=function() messages=messages+1 end
 local secret=setmetatable({}, {__tostring=function() error('secret formatted in Lua') end,

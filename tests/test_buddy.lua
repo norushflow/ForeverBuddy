@@ -1,3 +1,4 @@
+local loadfile = dofile("tests/load_locales.lua")
 local frames={}
 local methods={}
 function methods:SetScript(k,v) self.scripts[k]=v end
@@ -181,3 +182,19 @@ GameTooltip.Hide=function() error('forbidden tooltip touched') end
 assert(pcall(Buddy.HideTooltip))
 GameTooltip.IsForbidden=function() return false end;GameTooltip.Hide=oldHide
 print('PASS: zero-rested offline estimate and shared tooltip guard')
+
+-- Menu items close the hub; the inline action bar controls stay accessible.
+for _,module in ipairs(Buddy.modules) do
+    local handler=SlashCmdList[module.command]
+    local called=false
+    SlashCmdList[module.command]=function() called=true end
+    Buddy.panel:Show()
+    Buddy.OpenModule(module)
+    if module.key=="bars" then
+        assert(Buddy.panel:IsShown(),"bars must keep the hub open")
+    else
+        assert(called and not Buddy.panel:IsShown(),"module must close the hub: "..module.key)
+    end
+    SlashCmdList[module.command]=handler
+end
+print('PASS: menu closes for modules and stays open for action bars')

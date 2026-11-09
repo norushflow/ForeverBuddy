@@ -1,3 +1,4 @@
+local loadfile = dofile("tests/load_locales.lua")
 local B={db={mail={recipients={alchemy='Legacy'},recipientsByFaction={Horde={alchemy='Alt'}}}},Message=function() end}
 assert(loadfile('Modules/Mail.lua'))('Foreverbuddy',B)
 local M=B.Mail

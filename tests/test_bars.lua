@@ -1,3 +1,4 @@
+local loadfile = dofile("tests/load_locales.lua")
 -- Vertrags-/Zustandstests für die Aktionsleisten-Vorlagen.
 -- Kein Client, keine Taint-Simulation: geprüft werden Guards, Profile und Ereignisfluss.
 local secret=setmetatable({},{__tostring=function() error('secret formatted') end})
@@ -458,3 +459,13 @@ assert(B.events.events.PLAYER_LOGOUT and not B.events.events.PLAYER_SPECIALIZATI
     and B.events.events.ACTIONBAR_SLOT_CHANGED,'required events are registered')
 
 print('PASS: bar profiles, automatic save/load, click bindings, guards, secrets and inline menu')
+
+local apply=B.Apply
+local applied=0
+B.Apply=function() applied=applied+1;return true end
+ForeverBuddyUIActionStorage={OwnsAutomaticStorage=function() return true end}
+B.db.automatic=true;B.QueueLoad(0);drain()
+assert(applied==0,'character storage owns automatic restore when UI addon is active')
+B.Apply=apply
+ForeverBuddyUIActionStorage=nil
+print('PASS: optional ForeverBuddyUI coordination prevents competing automatic restores')

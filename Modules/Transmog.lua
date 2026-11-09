@@ -1,4 +1,5 @@
 local _, Buddy = ...
+local L = Buddy.L
 local T = {}
 Buddy.Transmog = T
 local function public(v) return not (issecretvalue and issecretvalue(v)) end
@@ -22,7 +23,7 @@ local function current()
     if not GetInstanceInfo then return end
     local name, kind, difficulty, difficultyName, _, _, _, map = GetInstanceInfo()
     if not text(kind) or (kind~="party" and kind~="raid") or not number(map) or not number(difficulty) then return end
-    return {name=text(name) and name or "Instanz", difficulty=difficulty,
+    return {name=text(name) and name or L["Instanz"], difficulty=difficulty,
         difficultyName=text(difficultyName) and difficultyName or tostring(difficulty), map=map,
         key=map..":"..difficulty}
 end
@@ -34,22 +35,22 @@ end
 -- Jede kurze Journaltransaktion stellt Auswahl und Filter vor der Rückgabe wieder her.
 -- Keine Auswahl bleibt über einen Timerwechsel hinweg bestehen.
 function T.ReadLoot(classID)
-    if InCombatLockdown() or not journalAvailable() then return nil,"Journal geöffnet oder Kampf aktiv." end
+    if InCombatLockdown() or not journalAvailable() then return nil,L["Journal geöffnet oder Kampf aktiv."] end
     local J=C_EncounterJournal
     if not J or not J.GetInstanceForGameMap or not EJ_GetLootFilter or not EJ_GetDifficulty then
-        return nil,"Dungeonjournal nicht verfügbar."
+        return nil,L["Dungeonjournal nicht verfügbar."]
     end
     local id=J.GetInstanceForGameMap(T.context.map)
-    if not number(id) or id<=0 then return nil,"Für diese Instanz gibt es keinen Journaleintrag." end
+    if not number(id) or id<=0 then return nil,L["Für diese Instanz gibt es keinen Journaleintrag."] end
     local oldClass,oldSpec=EJ_GetLootFilter()
     local oldDifficulty,oldSlot=EJ_GetDifficulty(),J.GetSlotFilter()
     if not number(oldClass) or not number(oldSpec) or not number(oldDifficulty) or not number(oldSlot) then
-        return nil,"Journalfilter derzeit nicht lesbar."
+        return nil,L["Journalfilter derzeit nicht lesbar."]
     end
     local oldInstance,oldEncounter
     if EncounterJournal then
         local ok,a,b=foreign(EncounterJournal,function(f) return f.instanceID,f.encounterID end)
-        if not ok then return nil,"Journal derzeit nicht lesbar." end
+        if not ok then return nil,L["Journal derzeit nicht lesbar."] end
         oldInstance=number(a) and a>0 and a or nil
         oldEncounter=number(b) and b>0 and b or nil
     end
@@ -63,18 +64,18 @@ function T.ReadLoot(classID)
             if number(base) and base>0 then difficulty=base end
         end
         local valid=J.InstanceHasDifficultyID(difficulty)
-        if not public(valid) or not valid then error("Schwierigkeit nicht im Journal verfügbar.") end
+        if not public(valid) or not valid then error(L["Schwierigkeit nicht im Journal verfügbar."]) end
         EJ_SetDifficulty(difficulty)
         EJ_SetLootFilter(classID,0)
         J.ResetSlotFilter()
         local count=EJ_GetNumLoot()
-        if not number(count) or count<0 or count>5000 then error("Beuteliste nicht lesbar.") end
+        if not number(count) or count<0 or count>5000 then error(L["Beuteliste nicht lesbar."]) end
         if count==0 then rows.incomplete=true end
         for i=1,count do
             local item=J.GetLootInfoByIndex(i)
             if record(item) and number(item.itemID) then
                 rows[#rows+1]={id=item.itemID,link=text(item.link) and item.link or nil,
-                    name=text(item.name) and item.name or ("Gegenstand "..item.itemID),
+                    name=text(item.name) and item.name or (L["Gegenstand "]..item.itemID),
                     boss=number(item.encounterID) and item.encounterID or nil}
             else rows.incomplete=true end
         end
@@ -88,7 +89,7 @@ function T.ReadLoot(classID)
     restore(EJ_SetLootFilter,oldClass,oldSpec)
     restore(J.SetSlotFilter,oldSlot)
     T.scanning=false
-    if not ok or not restored then return nil,text(err) and err or "Journal konnte nicht gelesen werden." end
+    if not ok or not restored then return nil,text(err) and err or L["Journal konnte nicht gelesen werden."] end
     return rows
 end
 
@@ -142,10 +143,10 @@ end
 function T.RefreshCollection()
     if not T.loot then return end
     local ok,result=pcall(T.Resolve,T.loot)
-    if not ok then status("Sammlungsdaten derzeit nicht verfügbar.");return end
+    if not ok then status(L["Sammlungsdaten derzeit nicht verfügbar."]);return end
     T.result=result
-    if result.incomplete or next(result.pending) then status("Daten werden geladen …")
-    elseif result.total==0 then status("Keine direkt zugeordneten Vorlagen im Journal.")
+    if result.incomplete or next(result.pending) then status(L["Daten werden geladen …"])
+    elseif result.total==0 then status(L["Keine direkt zugeordneten Vorlagen im Journal."])
     else status(nil) end
 end
 
@@ -167,9 +168,9 @@ function T.Update()
         T.context=context;T.loot=nil;T.result=nil;T.groups=nil;T.classIndex=nil;T.requested={};T.attempts=0
     end
     T.CreateBadge();T.badge:Show()
-    if InCombatLockdown() then status("Aktualisierung nach dem Kampf");return end
-    if not journalAvailable() then status("Aktualisierung nach Schließen des Journals");return end
-    if not C_TransmogCollection or not C_Item then status("Transmog-API nicht verfügbar.");return end
+    if InCombatLockdown() then status(L["Aktualisierung nach dem Kampf"]);return end
+    if not journalAvailable() then status(L["Aktualisierung nach Schließen des Journals"]);return end
+    if not C_TransmogCollection or not C_Item then status(L["Transmog-API nicht verfügbar."]);return end
     if not T.loot or T.retryLoot then
         T.retryLoot=nil
         local rows,err=T.ReadLoot(0)
@@ -252,7 +253,7 @@ function T.BuildLines()
     local other={}
     for _,item in ipairs(T.result.items) do if not item.collected and not assigned[item] then other[#other+1]=item end end
     if #other>0 then
-        lines[#lines+1]={heading="Weitere / noch nicht zugeordnete Gegenstände"}
+        lines[#lines+1]={heading=L["Weitere / noch nicht zugeordnete Gegenstände"]}
         for _,item in ipairs(other) do lines[#lines+1]=item end
     end
     return lines
@@ -264,14 +265,14 @@ function T.Render()
     if r and r.total>0 and not r.incomplete and not next(r.pending) then
         value=string.format("Transmog: %.1f %% (%d/%d)",r.collected/r.total*100,r.collected,r.total)
         if r.unresolved>0 then value=value.." *" end
-    elseif r and r.total==0 and not next(r.pending) then value="Transmog: keine Vorlagen" end
+    elseif r and r.total==0 and not next(r.pending) then value=L["Transmog: keine Vorlagen"] end
     if T.status and (not r or r.incomplete or next(r.pending)) then value="Transmog: …" end
     T.badge:SetText(value)
     if not T.panel or not T.panel:IsShown() then return end
     local context=T.context
-    T.heading:SetText(context and (context.name.." · "..context.difficultyName) or "Keine Dungeon-/Raidinstanz")
+    T.heading:SetText(context and (context.name.." · "..context.difficultyName) or L["Keine Dungeon-/Raidinstanz"])
     local loading=T.classes and T.classes[T.classIndex or 1]
-    T.summary:SetText((T.status or value)..(loading and "\nKlassenzuordnung wird geladen …" or ""))
+    T.summary:SetText((T.status or value)..(loading and L["\nKlassenzuordnung wird geladen …"] or ""))
     local lines=T.BuildLines()
     T.offset=math.max(0,math.min(T.offset or 0,math.max(0,#lines-14)))
     for i,button in ipairs(T.rows) do
@@ -279,22 +280,22 @@ function T.Render()
         button:SetShown(entry~=nil)
         if entry then
             button.label:SetText(entry.heading and ("|cffd0d0d0"..entry.heading.."|r") or
-                ((entry.row.link or entry.row.name)..(entry.unresolved and "  [Zuordnung offen]" or "")))
+                ((entry.row.link or entry.row.name)..(entry.unresolved and L["  [Zuordnung offen]"] or "")))
         end
     end
-    T.page:SetText(#lines>0 and string.format("%d–%d / %d · Mausrad zum Scrollen",T.offset+1,math.min(T.offset+14,#lines),#lines) or "Keine fehlenden Vorlagen in den geladenen Daten.")
+    T.page:SetText(#lines>0 and string.format(L["%d–%d / %d · Mausrad zum Scrollen"],T.offset+1,math.min(T.offset+14,#lines),#lines) or L["Keine fehlenden Vorlagen in den geladenen Daten."])
 end
 function T.Toggle()
-    if not current() then Buddy.Message("Die Transmogübersicht ist innerhalb eines Dungeons oder Raids verfügbar.");return end
+    if not current() then Buddy.Message(L["Die Transmogübersicht ist innerhalb eines Dungeons oder Raids verfügbar."]);return end
     if not T.panel then
         local p=CreateFrame("Frame","ForeverbuddyTransmogFrame",UIParent,"BackdropTemplate")
         T.panel=p;p:SetSize(650,560);p:SetPoint("CENTER");p:SetFrameStrata("DIALOG");p:SetFrameLevel(100)
         p:SetClampedToScreen(true);p:SetMovable(true);p:EnableMouse(true);p:RegisterForDrag("LeftButton")
         p:SetScript("OnDragStart",p.StartMoving);p:SetScript("OnDragStop",p.StopMovingOrSizing)
         Buddy.Style.Window(p)
-        label(p,"|cffd0d0d0ForeverBuddy · Dungeon-Transmog|r",20,-18,600)
+        label(p,L["|cffd0d0d0ForeverBuddy · Dungeon-Transmog|r"],20,-18,600)
         T.heading=label(p,"",20,-48,600);T.summary=label(p,"",20,-74,600)
-        label(p,"Accountweite Vorlagen · aktuelle Schwierigkeit · Klassen laut Journal\nMehrfachbeute zählt einmal. * Tokens/offene Zuordnungen zählen nicht zur Prozentzahl.",20,-118,610)
+        label(p,L["Accountweite Vorlagen · aktuelle Schwierigkeit · Klassen laut Journal\nMehrfachbeute zählt einmal. * Tokens/offene Zuordnungen zählen nicht zur Prozentzahl."],20,-118,610)
         T.rows={}
         for i=1,14 do
             local b=CreateFrame("Button",nil,p);b:SetSize(600,23);b:SetPoint("TOPLEFT",20,-167-(i-1)*23)
@@ -315,7 +316,7 @@ function T.Toggle()
         p:SetScript("OnHide",function() foreign(GameTooltip,function(t) t:Hide() end) end)
         T.page=label(p,"",20,-499,600)
         local refresh=Buddy.Style.Button(CreateFrame("Button",nil,p,"UIPanelButtonTemplate"))
-        refresh:SetSize(180,24);refresh:SetPoint("BOTTOMRIGHT",-20,12);refresh:SetText("Neu einlesen")
+        refresh:SetSize(180,24);refresh:SetPoint("BOTTOMRIGHT",-20,12);refresh:SetText(L["Neu einlesen"])
         refresh:SetScript("OnClick",function() T.retryLoot=true;T.attempts=0;schedule() end)
         local close=CreateFrame("Button",nil,p,"UIPanelCloseButton");close:SetPoint("TOPRIGHT",-3,-3)
         UISpecialFrames[#UISpecialFrames+1]="ForeverbuddyTransmogFrame"
