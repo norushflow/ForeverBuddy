@@ -30,6 +30,16 @@ jobs:
           fi
           echo "ADDON_VERSION=$version" >> "$GITHUB_ENV"
 
+      - name: Check release notes
+        shell: bash
+        run: |
+          if [[ ! -s RELEASE_NOTES.md ]] ||
+             [[ "$(head -n 1 RELEASE_NOTES.md)" != "# v$ADDON_VERSION" ]] ||
+             ! grep -Eq '^- [^[:space:]]' RELEASE_NOTES.md; then
+            echo "::error::RELEASE_NOTES.md must start with # v$ADDON_VERSION and contain English release notes."
+            exit 1
+          fi
+
       - name: Install packaging dependencies
         run: |
           sudo apt-get update -qq
@@ -43,21 +53,9 @@ jobs:
             mv -- "dist/$ADDON-$ADDON_VERSION.zip" "dist/$ADDON-$ADDON_VERSION$ZIP_SUFFIX.zip"
           fi
 
-      - name: Prepare addon changelog
-        shell: bash
-        run: |
-          awk -v version="$ADDON_VERSION" '
-            /^## / { if (found) exit; found = ($0 == "## " version); next }
-            found { print }
-          ' CHANGELOG.md > /tmp/addon-release-notes.md
-          if ! grep -q '^- ' /tmp/addon-release-notes.md; then
-            echo "::error::Missing addon changelog for $ADDON_VERSION"
-            exit 1
-          fi
-
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" "dist/$ADDON-$ADDON_VERSION$ZIP_SUFFIX.zip" \
-            --verify-tag --title "ForeverBuddy $ADDON_VERSION" --notes-file /tmp/addon-release-notes.md
+            --verify-tag --title "ForeverBuddy $ADDON_VERSION" --notes-file RELEASE_NOTES.md

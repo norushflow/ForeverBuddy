@@ -1,5 +1,9 @@
 package-as: Foreverbuddy
+manual-changelog:
+  filename: RELEASE_NOTES.md
+  markup-type: markdown
 ignore:
+  - RELEASE_NOTES.md
   - AGENTS.md
   - CHANGELOG.md
   - DEVELOPMENT.md
