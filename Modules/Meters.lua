@@ -1,5 +1,7 @@
 local _, Buddy = ...
 local L = Buddy.L
+local Style = Buddy.Style
+local Color = Style.Color
 local M={windows={}, generation=0}
 Buddy.Meters=M
 local ROWS=5
@@ -54,7 +56,7 @@ function M.Paint(window,session)
             local color
             if public(class) and type(class)=="string" and RAID_CLASS_COLORS then color=RAID_CLASS_COLORS[class] end
             if color then row:SetStatusBarColor(color.r,color.g,color.b,.38)
-            else row:SetStatusBarColor(.55,.43,.12,.38) end
+            else row:SetStatusBarColor(Color.bronze[1],Color.bronze[2],Color.bronze[3],.38) end
             row:Show()
         else row:Hide() end
     end
@@ -68,6 +70,7 @@ function M.Refresh()
     local sessionType=M.db.overall and Enum.DamageMeterSessionType.Overall or Enum.DamageMeterSessionType.Current
     for _,w in ipairs(M.windows) do
         w.segment:SetText(M.db.overall and L["Gesamt"] or L["Aktuell"])
+        Style.Select(w.segment,M.db.overall)
         local ok,data=pcall(C_DamageMeter.GetCombatSessionFromType,sessionType,w.kind)
         if ok then M.Paint(w,data) else M.Clear(w,L["Daten derzeit nicht verfügbar"]) end
     end
@@ -81,44 +84,39 @@ function M.Schedule()
         M.queued=nil;M.Refresh()
     end)
 end
-local function font(parent,template)
-    local text=parent:CreateFontString(nil,"OVERLAY",template or "GameFontHighlightSmall")
-    text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",template and 14 or 13,"")
-    text:SetShadowColor(0,0,0,1);text:SetShadowOffset(1,-1)
-    return text
-end
 function M.Create()
     if M.windows[1] then return end
+    local headerHeight = 27
     for index,title in ipairs({L["Schaden"],L["Heilung"]}) do
         local w=CreateFrame("Frame","ForeverbuddyMeter"..index,UIParent,"BackdropTemplate")
-        M.windows[index]=w;w:Hide();w:SetSize(260,195)
+        M.windows[index]=w;w:Hide();w:SetSize(260,headerHeight+ROWS*31+13)
         w:SetPoint("BOTTOMRIGHT",UIParent,"BOTTOMRIGHT",index==1 and -272 or -2,47)
         w:SetClampedToScreen(true);w:SetFrameStrata("MEDIUM")
-        Buddy.Style.Window(w,27)
-        w.title=font(w,"GameFontNormal");w.title:SetPoint("TOPLEFT",8,-8);w.title:SetText(title)
-        local switch=Buddy.Style.Button(CreateFrame("Button",nil,w,"UIPanelButtonTemplate"))
-        switch:SetSize(78,22);switch:SetPoint("TOPRIGHT",-6,-3);w.segment=switch
+        Style.Window(w,headerHeight)
+        w.title=Style.Text(w,"hud",Color.gold);w.title:SetPoint("TOPLEFT",10,-5);w.title:SetText(title)
+        local switch=Style.Button(CreateFrame("Button",nil,w,"UIPanelButtonTemplate"))
+        switch:SetSize(78,16);switch:SetPoint("TOPRIGHT",-6,-4);w.segment=switch
         switch:SetScript("OnClick",function()
             M.db.overall=not M.db.overall
             for _,other in ipairs(M.windows) do other.offset=0 end
             M.Refresh()
         end)
-        w.note=font(w);w.note:SetPoint("CENTER");w.note:SetWidth(240)
+        w.note=Style.Text(w,"hud",Color.muted);w.note:SetPoint("CENTER");w.note:SetWidth(240)
+        w.note:SetJustifyH("CENTER")
         w.rows={};w.offset=0
         for i=1,ROWS do
             local row=CreateFrame("StatusBar",nil,w)
-            row:SetSize(248,30);row:SetPoint("TOPLEFT",6,-29-(i-1)*31)
-            row:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+            row:SetSize(248,30);row:SetPoint("TOPLEFT",6,-headerHeight-2-(i-1)*31)
+            Style.Bar(row)
             local background=row:CreateTexture(nil,"BACKGROUND")
-            background:SetAllPoints(row);background:SetColorTexture(.06,.045,.015,.35)
-            local line=row:CreateTexture(nil,"OVERLAY")
-            line:SetPoint("BOTTOMLEFT");line:SetPoint("BOTTOMRIGHT");line:SetHeight(1)
-            line:SetColorTexture(.78,.78,.78,.28)
-            row.rank=font(row);row.rank:SetPoint("LEFT",3,0);row.rank:SetWidth(20)
-            row.name=font(row);row.name:SetPoint("LEFT",24,0);row.name:SetWidth(112)
+            background:SetAllPoints(row);background:SetColorTexture(unpack(Color.inset))
+            local line=Style.Divider(row)
+            line:SetPoint("BOTTOMLEFT");line:SetPoint("BOTTOMRIGHT")
+            row.rank=Style.Text(row,"hud",Color.gold);row.rank:SetPoint("LEFT",3,0);row.rank:SetWidth(20)
+            row.name=Style.Text(row,"body");row.name:SetPoint("LEFT",24,0);row.name:SetWidth(112)
             row.name:SetJustifyH("LEFT");row.name:SetWordWrap(false)
-            row.amount=font(row);row.amount:SetPoint("TOPRIGHT",-4,-1);row.amount:SetWidth(100);row.amount:SetJustifyH("RIGHT")
-            row.rate=font(row);row.rate:SetPoint("BOTTOMRIGHT",-4,1);row.rate:SetWidth(100);row.rate:SetJustifyH("RIGHT")
+            row.amount=Style.Text(row,"body");row.amount:SetPoint("TOPRIGHT",-4,-2);row.amount:SetWidth(100);row.amount:SetJustifyH("RIGHT")
+            row.rate=Style.Text(row,"small",Color.muted);row.rate:SetPoint("BOTTOMRIGHT",-4,3);row.rate:SetWidth(100);row.rate:SetJustifyH("RIGHT")
             row:Hide();w.rows[i]=row
         end
         w:EnableMouseWheel(true)

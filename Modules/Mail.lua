@@ -31,6 +31,7 @@ function M.ItemClass(itemID)
     end
 end
 function Buddy.LoadMail()
+    local style = Buddy.Style
     local db = Buddy.db.mail
     -- Legacy recipients have no faction information: retain them for reference,
     -- but never silently assign them to either faction.
@@ -130,32 +131,29 @@ function Buddy.LoadMail()
             p:RegisterForDrag("LeftButton")
             p:SetScript("OnDragStart",function(self) if not self.docked then self:StartMoving() end end)
             p:SetScript("OnDragStop",p.StopMovingOrSizing)
-            -- Use the game's dialog textures and unmodified native controls.
-            p:SetBackdrop({bgFile="Interface\\DialogFrame\\UI-DialogBox-Background",
-                edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border",tile=true,tileSize=32,edgeSize=32,
-                insets={left=11,right=12,top=12,bottom=11}})
-            p:SetBackdropColor(1,1,1,1)
-            local title=p:CreateFontString(nil,"OVERLAY","GameFontNormalLarge")
-            title:SetPoint("TOPLEFT",18,-18); title:SetText(L["Berufspost · "]..(faction=="Alliance" and L["Allianz"] or "Horde"))
-            local hint=p:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall")
-            hint:SetPoint("TOPLEFT",18,-43); hint:SetWidth(464); hint:SetJustifyH("LEFT"); hint:SetText(L["Vorname Nachname · Empfänger gelten nur für diese Fraktion."])
-            local close=CreateFrame("Button",nil,p,"UIPanelCloseButton"); close:SetPoint("TOPRIGHT",-3,-3)
+            style.Window(p,69)
+            local title=style.Text(p,"title")
+            title:SetPoint("TOPLEFT",18,-25); title:SetText(L["Berufspost · "]..(faction=="Alliance" and L["Allianz"] or "Horde"))
+            local hint=style.Text(p,"small",style.Color.muted)
+            hint:SetPoint("TOPLEFT",18,-49); hint:SetWidth(464); hint:SetJustifyH("LEFT")
+            hint:SetText(L["Vorname Nachname · Empfänger gelten nur für diese Fraktion."])
+            local close=style.Close(CreateFrame("Button",nil,p,"UIPanelCloseButton")); close:SetPoint("TOPRIGHT",-3,-3)
             for index,group in ipairs(M.groups) do
                 local g=group
                 local y=-80-(index-1)*32
-                local label=p:CreateFontString(nil,"OVERLAY","GameFontNormal")
+                local label=style.Text(p,"body",style.Color.gold)
                 label:SetPoint("TOPLEFT",18,y-7); label:SetText(g[2])
-                local edit=CreateFrame("EditBox",nil,p,"InputBoxTemplate")
+                local edit=style.EditBox(CreateFrame("EditBox",nil,p,"InputBoxTemplate"))
                 edit:SetSize(190,26); edit:SetPoint("TOPLEFT",190,y); edit:SetAutoFocus(false)
                 edit:SetMaxLetters(80); edit:SetText(list[g[1]] or "")
                 edit:SetScript("OnTextChanged",function(self) list[g[1]]=self:GetText() end)
                 edit:SetScript("OnEnterPressed",function(self) self:ClearFocus() end)
                 edit:SetScript("OnEscapePressed",function(self) self:ClearFocus() end)
-                local send=CreateFrame("Button",nil,p,"UIPanelButtonTemplate")
+                local send=style.Button(CreateFrame("Button",nil,p,"UIPanelButtonTemplate"))
                 send:SetSize(85,26); send:SetPoint("TOPLEFT",395,y); send:SetText(L["Senden"])
                 send:SetScript("OnClick",function() edit:ClearFocus(); M.Start(g) end)
             end
-            local cancel=CreateFrame("Button",nil,p,"UIPanelButtonTemplate")
+            local cancel=style.Button(CreateFrame("Button",nil,p,"UIPanelButtonTemplate"))
             cancel:SetSize(180,26); cancel:SetPoint("BOTTOM",0,15); cancel:SetText(L["Versand stoppen"])
             cancel:SetScript("OnClick",function() stop(L["Weitere Briefe gestoppt. Ein bereits gesendeter Brief bleibt versendet."]) end)
             UISpecialFrames[#UISpecialFrames+1]="ForeverbuddyMailPanel"

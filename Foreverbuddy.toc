@@ -3,7 +3,7 @@
 ## Notes: Characters, transmog, damage meters, action bars and profession mail for Forever.
 ## Notes-deDE: Charaktere, Transmog, Schadensanzeige, Aktionsleisten und Berufspost für Forever.
 ## Author: norushflow
-## Version: 1.1.7
+## Version: 1.1.8
 ## X-Curse-Project-ID: 1791314
 ## IconTexture: Interface\AddOns\Foreverbuddy\Media\BuddyIcon
 ## SavedVariables: ForeverbuddyDB

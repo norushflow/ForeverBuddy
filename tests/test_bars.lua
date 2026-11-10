@@ -30,6 +30,7 @@ function methods:SetText(v) self.text=v end
 function methods:GetText() return self.text end
 function methods:SetSize(w,h) self.width=w;self.height=h end
 function methods:SetWidth(v) self.width=v end
+function methods:SetHeight(v) self.height=v end
 function methods:SetPoint(...) self.points[#self.points+1]={...} end
 function methods:SetJustifyH(v) self.justify=v end
 function methods:SetFrameStrata(v) self.strata=v end
@@ -370,7 +371,7 @@ assert(not B.CopyClickBindings({[2]={type=1,actionID=133,button="LeftButton",mod
     'sparse click data is rejected')
 
 -- Automatik aus: keine automatischen Schreibläufe; Einschalten lädt erneut.
-B.menuButton=object()
+B.menuButton=Buddy.Style.Button(object())
 B.SetAutomatic(false)
 assert(B.menuButton.text=='Aktionsleisten · Automatik AUS','menu row reflects state')
 now=now+5
@@ -382,10 +383,15 @@ assert(B.menuButton.text=='Aktionsleisten · Automatik AN' and bar[1].value==194
     'enabling automatic mode backs up the current layout')
 
 -- Menübereich im bestehenden Fenster.
-local menuHeight=B.BuildMenu(object(),-100)
+local fittedHeight
+local menuHeight=B.BuildMenu(object(),-100,function(height) fittedHeight=height end)
 assert(menuHeight==B.MENU_HEIGHT and B.menuStatus.text:find('Automatik AN')
     and B.menuStatus.text:find('Jäger'),'inline menu shows state and specialization')
 assert(B.menuNote.text==B.note,'inline menu shows the last note')
+B.menuStatus.GetStringHeight=function() return 22 end
+B.menuNote.GetStringHeight=function() return 44 end
+B.RefreshMenu()
+assert(B.menu.height==168 and fittedHeight==168,'wrapped text grows the inline menu and hub together')
 local saveButton,loadButton
 for _,frame in ipairs(frames) do
     if frame.text=='Vorlage speichern' then saveButton=frame end

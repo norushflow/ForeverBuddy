@@ -1,5 +1,7 @@
 local _, Buddy = ...
 local L = Buddy.L
+local Style = Buddy.Style
+local Color = Style.Color
 local T = {}
 Buddy.Transmog = T
 local function public(v) return not (issecretvalue and issecretvalue(v)) end
@@ -210,13 +212,13 @@ function T.LoadNextClass()
     end
 end
 
-local function label(parent,value,x,y,width)
-    local f=parent:CreateFontString(nil,"OVERLAY","GameFontHighlight")
+local function label(parent,value,x,y,width,role,color)
+    local f=Style.Text(parent,role,color)
     f:SetPoint("TOPLEFT",x,y);f:SetWidth(width);f:SetJustifyH("LEFT");f:SetText(value);return f
 end
 function T.CreateBadge()
     if T.badge then return end
-    local b=Buddy.Style.Button(CreateFrame("Button","ForeverbuddyTransmogBadge",UIParent,"UIPanelButtonTemplate"))
+    local b=Style.Button(CreateFrame("Button","ForeverbuddyTransmogBadge",UIParent,"UIPanelButtonTemplate"))
     -- Rechts neben der mittigen Fußleistenuhr (100 Punkte breit), 12 Punkte Abstand.
     -- Eigener Bildschirmanker: keine Abhängigkeit oder Änderung am UI-Addon.
     T.badge=b;b:SetSize(230,28);b:SetPoint("BOTTOMLEFT",UIParent,"BOTTOM",62,5)
@@ -271,8 +273,9 @@ function T.Render()
         local entry=lines[T.offset+i];button.entry=entry
         button:SetShown(entry~=nil)
         if entry then
-            button.label:SetText(entry.heading and ("|cffd0d0d0"..entry.heading.."|r") or
+            button.label:SetText(entry.heading or
                 ((entry.row.link or entry.row.name)..(entry.unresolved and L["  [Zuordnung offen]"] or "")))
+            button.label:SetTextColor(unpack(entry.heading and Color.gold or Color.text))
         end
     end
     T.page:SetText(#lines>0 and string.format(L["%d–%d / %d · Mausrad zum Scrollen"],T.offset+1,math.min(T.offset+14,#lines),#lines) or L["Keine fehlenden Vorlagen in den geladenen Daten."])
@@ -284,14 +287,19 @@ function T.Toggle()
         T.panel=p;p:SetSize(650,560);p:SetPoint("CENTER");p:SetFrameStrata("DIALOG");p:SetFrameLevel(100)
         p:SetClampedToScreen(true);p:SetMovable(true);p:EnableMouse(true);p:RegisterForDrag("LeftButton")
         p:SetScript("OnDragStart",p.StartMoving);p:SetScript("OnDragStop",p.StopMovingOrSizing)
-        Buddy.Style.Window(p)
-        label(p,L["|cffd0d0d0ForeverBuddy · Dungeon-Transmog|r"],20,-18,600)
-        T.heading=label(p,"",20,-48,600);T.summary=label(p,"",20,-74,600)
-        label(p,L["Accountweite Vorlagen · aktuelle Schwierigkeit · Klassen laut Journal\nMehrfachbeute zählt einmal. * Tokens/offene Zuordnungen zählen nicht zur Prozentzahl."],20,-118,610)
+        Style.Window(p,49)
+        label(p,L["ForeverBuddy · Dungeon-Transmog"],20,-25,600,"title")
+        T.heading=label(p,"",20,-56,600,"heading");T.summary=label(p,"",20,-77,600)
+        label(p,L["Accountweite Vorlagen · aktuelle Schwierigkeit · Klassen laut Journal\nMehrfachbeute zählt einmal. * Tokens/offene Zuordnungen zählen nicht zur Prozentzahl."],20,-118,610,"small",Color.muted)
+        local list=CreateFrame("Frame",nil,p)
+        list:SetPoint("TOPLEFT",20,-158);list:SetSize(610,336)
+        Style.Inset(list)
         T.rows={}
         for i=1,14 do
-            local b=CreateFrame("Button",nil,p);b:SetSize(600,23);b:SetPoint("TOPLEFT",20,-167-(i-1)*23)
-            b.label=label(b,"",0,0,600);b.label:SetHeight(22);b.label:SetWordWrap(false);T.rows[i]=b
+            local b=CreateFrame("Button",nil,list);b:SetSize(594,23);b:SetPoint("TOPLEFT",8,-7-(i-1)*23)
+            local highlight=b:CreateTexture(nil,"HIGHLIGHT")
+            highlight:SetAllPoints();highlight:SetColorTexture(unpack(Color.highlight))
+            b.label=label(b,"",5,0,584);b.label:SetHeight(22);b.label:SetWordWrap(false);T.rows[i]=b
             b:SetScript("OnClick",function(self)
                 if self.entry and self.entry.row and self.entry.row.link and not InCombatLockdown() then
                     HandleModifiedItemClick(self.entry.row.link)
@@ -306,11 +314,11 @@ function T.Toggle()
         end
         p:EnableMouseWheel(true);p:SetScript("OnMouseWheel",function(_,delta) T.offset=(T.offset or 0)-delta*3;T.Render() end)
         p:SetScript("OnHide",Buddy.HideTooltip)
-        T.page=label(p,"",20,-499,600)
-        local refresh=Buddy.Style.Button(CreateFrame("Button",nil,p,"UIPanelButtonTemplate"))
+        T.page=label(p,"",20,-503,600,"small",Color.muted)
+        local refresh=Style.Button(CreateFrame("Button",nil,p,"UIPanelButtonTemplate"))
         refresh:SetSize(180,24);refresh:SetPoint("BOTTOMRIGHT",-20,12);refresh:SetText(L["Neu einlesen"])
         refresh:SetScript("OnClick",function() T.retryLoot=true;T.attempts=0;schedule() end)
-        local close=CreateFrame("Button",nil,p,"UIPanelCloseButton");close:SetPoint("TOPRIGHT",-3,-3)
+        local close=Style.Close(CreateFrame("Button",nil,p,"UIPanelCloseButton"));close:SetPoint("TOPRIGHT",-3,-3)
         UISpecialFrames[#UISpecialFrames+1]="ForeverbuddyTransmogFrame"
     else T.panel:SetShown(not T.panel:IsShown()) end
     if T.panel:IsShown() then T.Render();schedule() end

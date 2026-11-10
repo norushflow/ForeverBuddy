@@ -102,7 +102,6 @@ validate_release_metadata() {
     regular_path "$icon" && [[ -s $icon ]] || fail "TOC-Icon fehlt oder ist ungültig: $icon"
     local assets=()
     case $addon in
-        AzerothBuddy|Foreverbuddy) assets=(Media/MORPHEUS.TTF) ;;
         AzerothBuddyUI|Foreverbuddyui) assets=(Media/BuddyIcon.png Media/Selection.tga) ;;
     esac
     if [[ $addon == Foreverbuddyui ]]; then

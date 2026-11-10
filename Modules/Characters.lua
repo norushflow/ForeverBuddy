@@ -1,5 +1,7 @@
-local addonName, Buddy = ...
+local _, Buddy = ...
 local L = Buddy.L
+local Style = Buddy.Style
+local Color = Style.Color
 function Buddy.LoadCharacters()
 local AltMiniDB = Buddy.db.characters
 -- Account character snapshots and overview.
@@ -10,8 +12,6 @@ AltMiniDB.sort    = AltMiniDB.sort or { key = "level", asc = false }
 AltMiniDB.filters = AltMiniDB.filters or { class = nil, prof = nil }
 
 -- ---------------- Config ----------------
-local FONT_PATH  = STANDARD_TEXT_FONT
-local FONT_SIZE  = 14
 local ROW_H      = 30
 local LIST_ROWS    = 12 -- Zeilenpool; sichtbar sind je nach Datenmenge 5…12
 local LIST_TOP = 226
@@ -35,11 +35,9 @@ local function SafeStr(x) if issecretvalue and issecretvalue(x) then return "—
 local function SafeNum(x) if issecretvalue and issecretvalue(x) then return 0 end;x = tonumber(x);return x or 0 end
 local function Round1(x) return math.floor((x * 10) + 0.5) / 10 end
 
-local function MakeFS(parent)
-local fs = parent:CreateFontString(nil, "OVERLAY")
-fs:SetFont(FONT_PATH, FONT_SIZE, "")
+local function MakeFS(parent, role, color)
+local fs = Style.Text(parent, role, color)
 fs:SetJustifyH("LEFT")
-fs:SetTextColor(1,1,1)
 return fs
 end
 
@@ -325,46 +323,26 @@ end
 local CLASS_TEX = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
 
 local function CreateIconButton(parent, size, iconTex, onClick)
-local b = CreateFrame("Button", nil, parent)
+local b = Style.Icon(CreateFrame("Button", nil, parent))
 b:SetSize(size, size)
 
-local bg = b:CreateTexture(nil, "BACKGROUND")
-bg:SetAllPoints()
-bg:SetColorTexture(0, 0, 0, 0.35)
-
-local t = b:CreateTexture(nil, "ARTWORK")
-t:SetAllPoints()
-b.icon = t
-if iconTex then t:SetTexture(iconTex) end
-
-local hl = b:CreateTexture(nil, "HIGHLIGHT")
-hl:SetAllPoints()
-hl:SetColorTexture(1,1,1,0.08)
-
-local border = b:CreateTexture(nil, "OVERLAY")
-border:SetAllPoints()
-border:SetColorTexture(1,1,1,0.10)
-b.border = border
+local icon = b:CreateTexture(nil, "ARTWORK")
+icon:SetPoint("TOPLEFT", 2, -2)
+icon:SetPoint("BOTTOMRIGHT", -2, 2)
+b.icon = icon
+if iconTex then icon:SetTexture(iconTex) end
 
 b:SetScript("OnClick", onClick)
 b:SetScript("OnEnter", function(self)
- Buddy.Foreign(GameTooltip, function()
- GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
- GameTooltip:AddLine(self.profName or (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[self.classTag]) or self.classTag or "Filter")
- GameTooltip:AddLine(L["Klicken zum Filtern; erneut klicken zum Aufheben"],0.7,0.75,0.8)
- GameTooltip:Show()
- end)
+ local tooltip = Style.Tooltip(self, "ANCHOR_RIGHT")
+ tooltip:AddLine(self.profName or (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[self.classTag]) or self.classTag or "Filter",
+     unpack(Color.gold, 1, 3))
+ tooltip:AddLine(L["Klicken zum Filtern; erneut klicken zum Aufheben"], unpack(Color.muted, 1, 3))
+ Style.ShowTooltip()
 end)
-b:SetScript("OnLeave", Buddy.HideTooltip)
+b:SetScript("OnLeave", Style.HideTooltip)
+b:SetScript("OnHide", Style.HideTooltip)
 return b
-end
-
-local function SetButtonActive(btn, active)
-if active then
-btn.border:SetColorTexture(.78, .78, .78, 0.25)
-else
-btn.border:SetColorTexture(1, 1, 1, 0)
-end
 end
 
 local function GetUniqueProfessions()
@@ -397,63 +375,46 @@ ui:SetScript("OnDragStart", ui.StartMoving)
 ui:SetScript("OnDragStop", ui.StopMovingOrSizing)
 ui:Hide()
 
-Buddy.Style.Window(ui,nil,.90)
-local accent = ui:CreateTexture(nil, "ARTWORK")
-accent:SetColorTexture(0.93, 0.78, 0.44, 0.7)
-accent:SetPoint("TOPLEFT", 0, 0); accent:SetPoint("TOPRIGHT", 0, 0); accent:SetHeight(2)
+Style.Window(ui, 62)
 local logo = ui:CreateTexture(nil, "ARTWORK")
 logo:SetTexture(LOGO_PATH); logo:SetSize(38,38); logo:SetPoint("TOPLEFT",20,-16)
-local subtitle = MakeFS(ui)
-subtitle:SetPoint("TOPLEFT",70,-42); subtitle:SetText(L["Deine Charaktere auf einen Blick"])
-subtitle:SetTextColor(0.62,0.69,0.73)
-ui.summary = MakeFS(ui)
-ui.summary:SetPoint("BOTTOMLEFT",24,16); ui.summary:SetTextColor(0.62,0.69,0.73)
-ui.empty = MakeFS(ui)
+local subtitle = MakeFS(ui, "small", Color.muted)
+subtitle:SetPoint("TOPLEFT",70,-48); subtitle:SetText(L["Deine Charaktere auf einen Blick"])
+ui.summary = MakeFS(ui, "small", Color.muted)
+ui.summary:SetPoint("BOTTOMLEFT",24,16)
+ui.empty = MakeFS(ui, "body", Color.muted)
 ui.empty:SetPoint("TOP",0,-LIST_TOP-40); ui.empty:SetText(L["Keine Charaktere für diese Filter gefunden."])
-ui.empty:SetTextColor(0.62,0.69,0.73); ui.empty:Hide()
+ui.empty:Hide()
 UISpecialFrames[#UISpecialFrames+1] = "ForeverbuddyCharactersFrame"
 
-local function StyleTab(button)
-    button.fill = button:CreateTexture(nil,"BACKGROUND")
-    button.fill:SetAllPoints()
-    button.line = button:CreateTexture(nil,"ARTWORK")
-    button.line:SetPoint("BOTTOMLEFT"); button.line:SetPoint("BOTTOMRIGHT"); button.line:SetHeight(2)
-    button.line:SetColorTexture(0.93,0.78,0.44,1)
-end
-
 -- Tabs
-ui.tab1 = Buddy.Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTemplate"))
+ui.tab1 = Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTemplate"))
 ui.tab1:SetSize(140, 30)
-StyleTab(ui.tab1)
 ui.tab1:SetPoint("TOPLEFT", 20, -65)
 ui.tab1:SetText(L["Übersicht"])
 ui.tab1:SetScript("OnClick", function() CURRENT_TAB = 1; FauxScrollFrame_SetOffset(ui.scroll, 0); if ui.Render then ui.Render() end end)
 
-ui.tab2 = Buddy.Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTemplate"))
+ui.tab2 = Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTemplate"))
 ui.tab2:SetSize(180, 30)
-StyleTab(ui.tab2)
 ui.tab2:SetPoint("LEFT", ui.tab1, "RIGHT", 5, 0)
 ui.tab2:SetText(L["Klassen-Statistik"])
 ui.tab2:SetScript("OnClick", function() CURRENT_TAB = 2; FauxScrollFrame_SetOffset(ui.scroll, 0); if ui.Render then ui.Render() end end)
 
 -- Title
-ui.title = MakeFS(ui)
-ui.title:SetPoint("TOPLEFT", 70, -19)
-ui.title:SetFont(FONT_PATH, 18, "")
-ui.title:SetTextColor(.78,.78,.78)
+ui.title = MakeFS(ui, "title")
+ui.title:SetPoint("TOPLEFT", 70, -25)
 ui.title:SetText(L["ForeverBuddy · Charaktere"])
 
 -- Account Playtime (top-right)
-ui.accountPlaytime = MakeFS(ui)
+ui.accountPlaytime = MakeFS(ui, "body", Color.muted)
 ui.accountPlaytime:SetPoint("TOPRIGHT", -58, -22)
-ui.accountPlaytime:SetTextColor(0.76,0.81,0.83)
 ui.accountPlaytime:SetJustifyH("RIGHT")
 ui.accountPlaytime:SetText(L["Erfasste Spielzeit: 0d 0h 0m"])
 
-local close = CreateFrame("Button", nil, ui, "UIPanelCloseButton")
+local close = Style.Close(CreateFrame("Button", nil, ui, "UIPanelCloseButton"))
 close:SetPoint("TOPRIGHT", -4, -4)
 
-local refresh = Buddy.Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTemplate"))
+local refresh = Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTemplate"))
 refresh:SetSize(110, 24)
 refresh:SetPoint("TOPRIGHT", -24, -66)
 refresh:SetText(L["Aktualisieren"])
@@ -463,12 +424,12 @@ local filterBg = CreateFrame("Frame", nil, ui, "BackdropTemplate")
 filterBg:SetPoint("TOPLEFT", 20, -99)
 filterBg:SetPoint("TOPRIGHT", -24, -99)
 filterBg:SetHeight(78)
-Buddy.Style.Inset(filterBg)
+Style.Inset(filterBg)
 
 -- Clear filters (right side)
-ui.clearBtn = Buddy.Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTemplate"))
+ui.clearBtn = Style.Button(CreateFrame("Button", nil, filterBg, "UIPanelButtonTemplate"))
 ui.clearBtn:SetSize(145, 24)
-ui.clearBtn:SetPoint("TOPRIGHT", -32, -106)
+ui.clearBtn:SetPoint("TOPRIGHT", ui, "TOPRIGHT", -32, -106)
 ui.clearBtn:SetText(L["Filter zurücksetzen"])
 ui.clearBtn:SetScript("OnClick", function()
 local flt = EnsureFilters()
@@ -477,9 +438,9 @@ if ui and ui.Render then ui.Render() end
 end)
 
 -- Labels in filter bar
-ui.classLabel = MakeFS(ui)
-ui.classLabel:SetPoint("TOPLEFT", CLASS_LABEL_X, -111)
-ui.classLabel:SetText("Klasse:")
+ui.classLabel = MakeFS(filterBg, "body", Color.gold)
+ui.classLabel:SetPoint("TOPLEFT", ui, "TOPLEFT", CLASS_LABEL_X, -111)
+ui.classLabel:SetText(L["Klasse"])
 
 -- Class icons
 ui.classButtons = {}
@@ -496,12 +457,12 @@ end
 
 local x = CLASS_ICONS_X
 for _, classTag in ipairs(classOrder) do
-local btn = CreateIconButton(ui, ICON_SIZE, CLASS_TEX, function()
+local btn = CreateIconButton(filterBg, ICON_SIZE, CLASS_TEX, function()
 local flt = EnsureFilters()
 if flt.class == classTag then flt.class = nil else flt.class = classTag end
 if ui and ui.Render then ui.Render() end
 end)
-btn:SetPoint("TOPLEFT", x, ICON_Y_OFFSET)
+btn:SetPoint("TOPLEFT", ui, "TOPLEFT", x, ICON_Y_OFFSET)
 btn.classTag = classTag
 
 if CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[classTag] then
@@ -516,19 +477,19 @@ x = x + ICON_SIZE + ICON_GAP
 end
 
 -- Profession label
-ui.profLabel = MakeFS(ui)
-ui.profLabel:SetPoint("TOPLEFT", CLASS_LABEL_X, -149)
-ui.profLabel:SetText("Berufe:")
+ui.profLabel = MakeFS(filterBg, "body", Color.gold)
+ui.profLabel:SetPoint("TOPLEFT", ui, "TOPLEFT", CLASS_LABEL_X, -149)
+ui.profLabel:SetText(L["Berufe"])
 
 -- Profession icons (dynamic)
 ui.profButtons = {}
 ui.profAnchorX = CLASS_ICONS_X
+ui.filterBg = filterBg
 ui.profY = -143
 
 -- Selected filter text
-ui.filterLabel = MakeFS(ui)
+ui.filterLabel = MakeFS(ui, "small", Color.muted)
 ui.filterLabel:SetWidth(1180)
-ui.filterLabel:SetTextColor(0.68,0.75,0.78)
 ui.filterLabel:SetText("")
 ui.filterLabel:Hide()
 
@@ -537,21 +498,23 @@ local headerBg = CreateFrame("Frame", nil, ui, "BackdropTemplate")
 headerBg:SetPoint("TOPLEFT", 20, -194)
 headerBg:SetPoint("TOPRIGHT", -24, -194)
 headerBg:SetHeight(28)
-Buddy.Style.Inset(headerBg)
+Style.Inset(headerBg)
 
 -- Clickable headers
 ui.headers = {}
 local hx = 24
 for i, col in ipairs(COLS) do
-local btn = CreateFrame("Button", nil, ui)
-btn:SetPoint("TOPLEFT", hx, -197)
+local btn = Style.Button(CreateFrame("Button", nil, headerBg))
+btn:SetPoint("TOPLEFT", ui, "TOPLEFT", hx, -197)
 btn:SetSize(col.w, 22)
 btn.colKey = col.key
 
-btn.text = MakeFS(btn)
+btn.text = MakeFS(btn, "body", Color.muted)
 btn.text:SetAllPoints()
-btn.text:SetJustifyH("LEFT")
-btn.text:SetTextColor(0.92,0.80,0.54)
+
+local highlight = btn:CreateTexture(nil, "HIGHLIGHT")
+highlight:SetAllPoints()
+highlight:SetColorTexture(unpack(Color.highlight))
 
 btn:SetScript("OnClick", function()
 if CURRENT_TAB ~= 1 then return end
@@ -578,11 +541,12 @@ row:SetPoint("TOPRIGHT", -28, -LIST_TOP - (i-1)*ROW_H)
 
 local bg = row:CreateTexture(nil, "BACKGROUND")
 bg:SetAllPoints()
-if i % 2 == 0 then bg:SetColorTexture(0.25,0.22,0.16,0.30) else bg:SetColorTexture(0.08,0.07,0.06,0.24) end
+local inset = Color.inset
+bg:SetColorTexture(inset[1], inset[2], inset[3], i % 2 == 0 and .8 or .35)
 
 local hl = row:CreateTexture(nil, "HIGHLIGHT")
 hl:SetAllPoints()
-hl:SetColorTexture(0.93,0.78,0.44,0.10)
+hl:SetColorTexture(unpack(Color.highlight))
 
 row.cells = {}
 local cx = 0
@@ -603,8 +567,9 @@ local function UpdateHeaderTexts()
 local s = GetSortState()
 for i, col in ipairs(COLS) do
 local btn = ui.headers[i]
-local arrow = ""
-if s.key == col.key then arrow = s.asc and " +" or " -" end
+local selected = s.key == col.key
+local arrow = selected and (s.asc and " +" or " -") or ""
+btn.text:SetTextColor(unpack(selected and Color.gold or Color.text))
 btn.text:SetText(col.title .. arrow)
 end
 end
@@ -625,7 +590,7 @@ local gapP  = ICON_GAP
 for i, profName in ipairs(names) do
 local btn = ui.profButtons[i]
 if not btn then
-btn = CreateIconButton(ui, sizeP, nil, function(self)
+btn = CreateIconButton(ui.filterBg, sizeP, nil, function(self)
 local flt = EnsureFilters()
 if flt.prof == self.profName then flt.prof = nil else flt.prof = self.profName end
 if ui and ui.Render then ui.Render() end
@@ -637,7 +602,7 @@ btn.profName = profName
 btn.icon:SetTexture(profs[profName] or "Interface\\Icons\\INV_Misc_QuestionMark")
 btn.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 btn:ClearAllPoints()
-btn:SetPoint("TOPLEFT", px, py)
+btn:SetPoint("TOPLEFT", ui, "TOPLEFT", px, py)
 btn:Show()
 
 px = px + sizeP + gapP
@@ -649,11 +614,11 @@ local function UpdateFilterVisuals()
 local flt = EnsureFilters()
 
 for _, b in ipairs(ui.classButtons) do
-SetButtonActive(b, flt.class == b.classTag)
+Style.Select(b, flt.class == b.classTag)
 end
 for _, b in ipairs(ui.profButtons) do
 if b:IsShown() then
-SetButtonActive(b, flt.prof == b.profName)
+Style.Select(b, flt.prof == b.profName)
 end
 end
 
@@ -667,12 +632,8 @@ end
 
 -- Main Render
 local function Render()
-for index, tab in ipairs({ui.tab1,ui.tab2}) do
-    local selected = index == CURRENT_TAB
-    tab.line:SetShown(selected)
-    tab.fill:SetColorTexture(0.65,0.5,0.2,selected and .15 or 0)
-    tab:GetFontString():SetTextColor(selected and .9 or 0.65,selected and .9 or 0.71,selected and .9 or 0.74)
-end
+Style.Select(ui.tab1, CURRENT_TAB == 1)
+Style.Select(ui.tab2, CURRENT_TAB == 2)
 ui.accountPlaytime:SetText(L["Erfasste Spielzeit: "] .. SecToDHM(GetAccountPlaytimeSeconds()))
 
 if CURRENT_TAB == 1 then
@@ -756,7 +717,7 @@ if key == "class" or key == "name" then
 local r,g,b = GetClassColorRGB(c.class)
 cell:SetTextColor(r,g,b)
 else
-cell:SetTextColor(0.83,0.87,0.89)
+cell:SetTextColor(unpack(Color.text))
 end
 end
 else
@@ -777,6 +738,7 @@ for _, b in ipairs(ui.profButtons) do b:Hide() end
 for i, b in ipairs(ui.headers) do
  b:SetShown(i <= 2)
  b.text:SetText(i == 1 and L["Klasse"] or L["Spielzeit"])
+ b.text:SetTextColor(unpack(Color.text))
 end
 
 local stats = GetClassStats()
@@ -805,7 +767,7 @@ local r,g,b = GetClassColorRGB(s.class)
 cell:SetTextColor(r,g,b)
 elseif colIdx == 2 then
 cell:SetText(SecToDHM(s.time))
-cell:SetTextColor(0.83,0.87,0.89)
+cell:SetTextColor(unpack(Color.text))
 else
 cell:SetText("")
 end

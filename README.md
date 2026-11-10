@@ -1,4 +1,4 @@
-# ForeverBuddy 1.1.7
+# ForeverBuddy 1.1.8
 
 <p align="center"><img src="branding/icon-400.png" alt="ForeverBuddy" width="160" height="160"></p>
 

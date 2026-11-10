@@ -346,39 +346,45 @@ function Buddy.LoadBars()
 
     -- Kompakte Bedienung im bestehenden Buddy-Menü; kein eigenes Fenster.
     B.MENU_HEIGHT=122
-    function B.BuildMenu(parent,top)
+    function B.BuildMenu(parent,top,fitFooter)
+        local style=Buddy.Style
         local box=CreateFrame("Frame",nil,parent,"BackdropTemplate")
         box:SetPoint("TOPLEFT",22,top);box:SetSize(346,B.MENU_HEIGHT)
-        Buddy.Style.Inset(box)
-        local title=box:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+        style.Inset(box)
+        local title=style.Text(box,"heading")
         title:SetPoint("TOPLEFT",10,-8);title:SetText(L["Aktionsleisten-Vorlagen"])
-        B.menuStatus=box:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall")
-        B.menuStatus:SetPoint("TOPLEFT",10,-27);B.menuStatus:SetWidth(326)
-        B.menuStatus:SetJustifyH("LEFT")
-        B.menuNote=box:CreateFontString(nil,"OVERLAY","GameFontDisableSmall")
-        B.menuNote:SetPoint("TOPLEFT",10,-45);B.menuNote:SetWidth(326)
-        B.menuNote:SetJustifyH("LEFT")
-        local save=Buddy.Style.Button(CreateFrame("Button",nil,box,"UIPanelButtonTemplate"))
+        B.menuStatus=style.Text(box,"small")
+        B.menuStatus:SetPoint("TOPLEFT",10,-30);B.menuStatus:SetWidth(326)
+        B.menuStatus:SetJustifyH("LEFT");B.menuStatus:SetWordWrap(true)
+        B.menuNote=style.Text(box,"small",style.Color.muted)
+        B.menuNote:SetPoint("TOPLEFT",B.menuStatus,"BOTTOMLEFT",0,-4);B.menuNote:SetWidth(326)
+        B.menuNote:SetJustifyH("LEFT");B.menuNote:SetWordWrap(true)
+        local save=style.Button(CreateFrame("Button",nil,box,"UIPanelButtonTemplate"))
         save:SetSize(150,24);save:SetPoint("BOTTOMLEFT",10,10);save:SetText(L["Vorlage speichern"])
         save:SetScript("OnClick",function() return requestTemplate(true) end)
-        local load=Buddy.Style.Button(CreateFrame("Button",nil,box,"UIPanelButtonTemplate"))
+        local load=style.Button(CreateFrame("Button",nil,box,"UIPanelButtonTemplate"))
         load:SetSize(150,24);load:SetPoint("BOTTOMRIGHT",-10,10);load:SetText(L["Vorlage laden"])
         load:SetScript("OnClick",function() return requestTemplate(false) end)
         B.roleCheckboxes={}
         for index,role in ipairs(roles) do
-            local check=CreateFrame("CheckButton",nil,box,"UICheckButtonTemplate")
+            local check=style.Check(CreateFrame("CheckButton",nil,box,"UICheckButtonTemplate"))
             check:SetSize(24,24);check:SetPoint("BOTTOMLEFT",10+(index-1)*108,40)
-            local label=box:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall")
+            local label=style.Text(box,"body")
             label:SetPoint("LEFT",check,"RIGHT",2,0);label:SetText(L[roleLabels[role]])
             check:SetScript("OnClick",function() B.SetRole(role) end)
             B.roleCheckboxes[role]=check
         end
         B.menu=box
-        B.RefreshMenu()
-        return B.MENU_HEIGHT
+        B.fitFooter=nil
+        local height=B.RefreshMenu()
+        B.fitFooter=fitFooter
+        return height
     end
     function B.RefreshMenu()
-        if B.menuButton and B.RowText then B.menuButton:SetText(B.RowText()) end
+        if B.menuButton and B.RowText then
+            B.menuButton:SetText(B.RowText())
+            Buddy.Style.Select(B.menuButton,B.db.automatic)
+        end
         if not B.menu then return end
         local role=B.Role()
         local state,label,suffix,profile=B.Status(role)
@@ -387,6 +393,12 @@ function Buddy.LoadBars()
         B.menuStatus:SetText(state.." · "..label.." · "..suffix..editor)
         B.menuNote:SetText(B.note or "")
         for key,check in pairs(B.roleCheckboxes) do check:SetChecked(key==role) end
+        local textHeight=(B.menuStatus:GetStringHeight() or 0)+(B.menuNote:GetStringHeight() or 0)
+        -- Keep wrapped messages above the 24-point role controls and the button row.
+        local height=math.max(B.MENU_HEIGHT,math.ceil(102+textHeight))
+        B.menu:SetHeight(height)
+        if B.fitFooter then B.fitFooter(height) end
+        return height
     end
 
     function B.Command(input)

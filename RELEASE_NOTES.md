@@ -1,6 +1,5 @@
-# v1.1.7
+# v1.1.8
 
-- Run the profession mail update only while a send is in progress.
-- Reduce repeated sorting and rested XP calculations in the character overview.
-- Reuse the existing frame and tooltip guards in the transmog module.
-- Streamline local checks and make release ZIPs reproducible.
+- Match the Retail design across the hub, character overview, transmog, damage and healing meters, and profession mail.
+- Refresh the action bar template panel and wrap longer status messages above the existing role, save, and load controls.
+- Use WoW’s native nameplate texture for meter bars and the client font when an optional Expressway file is unavailable.
