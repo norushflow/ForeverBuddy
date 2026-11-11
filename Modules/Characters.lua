@@ -27,9 +27,6 @@ local ICON_GAP        = 6
 local CLASS_LABEL_X   = 24
 local CLASS_ICONS_X   = 106
 
-
-local LOGO_PATH = "Interface\\AddOns\\Foreverbuddy\\Media\\BuddyIcon"
-
 -- ---------------- Utils ----------------
 local function SafeStr(x) if issecretvalue and issecretvalue(x) then return "—" end;return (x and x ~= "" and x) or "—" end
 local function SafeNum(x) if issecretvalue and issecretvalue(x) then return 0 end;x = tonumber(x);return x or 0 end
@@ -376,10 +373,8 @@ ui:SetScript("OnDragStop", ui.StopMovingOrSizing)
 ui:Hide()
 
 Style.Window(ui, 62)
-local logo = ui:CreateTexture(nil, "ARTWORK")
-logo:SetTexture(LOGO_PATH); logo:SetSize(38,38); logo:SetPoint("TOPLEFT",20,-16)
 local subtitle = MakeFS(ui, "small", Color.muted)
-subtitle:SetPoint("TOPLEFT",70,-48); subtitle:SetText(L["Deine Charaktere auf einen Blick"])
+subtitle:SetPoint("TOPLEFT",20,-48); subtitle:SetText(L["Deine Charaktere auf einen Blick"])
 ui.summary = MakeFS(ui, "small", Color.muted)
 ui.summary:SetPoint("BOTTOMLEFT",24,16)
 ui.empty = MakeFS(ui, "body", Color.muted)
@@ -402,7 +397,7 @@ ui.tab2:SetScript("OnClick", function() CURRENT_TAB = 2; FauxScrollFrame_SetOffs
 
 -- Title
 ui.title = MakeFS(ui, "title")
-ui.title:SetPoint("TOPLEFT", 70, -25)
+ui.title:SetPoint("TOPLEFT", 20, -25)
 ui.title:SetText(L["ForeverBuddy · Charaktere"])
 
 -- Account Playtime (top-right)

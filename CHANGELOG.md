@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.9
+
+- Remove the logo from the character overview and align the title and subtitle with the tabs.
+
 ## 1.1.8
 
 - Match the Retail design across the hub, character overview, transmog, damage and healing meters, and profession mail.
