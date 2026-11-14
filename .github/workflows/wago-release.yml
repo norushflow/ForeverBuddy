@@ -1,0 +1,98 @@
+name: Wago release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published stable GitHub release tag (vX.Y.Z)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wago-release
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Upload the published GitHub ZIP to Wago
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          WAGO_PROJECT_ID: ${{ vars.WAGO_PROJECT_ID }}
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+
+          [[ $RELEASE_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Use a vX.Y.Z tag."
+          [[ $WAGO_PROJECT_ID =~ ^[A-Za-z0-9]{8}$ ]] || fail "Set the WAGO_PROJECT_ID repository variable."
+          [[ -n $WAGO_API_TOKEN ]] || fail "Set the WAGO_API_TOKEN repository secret."
+
+          version=${RELEASE_TAG#v}
+          addon=${GH_REPO##*/}
+          case $addon in
+            ForeverBuddy) addon=Foreverbuddy ;;
+            ForeverBuddyUI) addon=Foreverbuddyui ;;
+          esac
+
+          release=$(gh release view "$RELEASE_TAG" --json tagName,isDraft,isPrerelease,body,assets)
+          jq -e --arg tag "$RELEASE_TAG" '
+            .tagName == $tag and (.isDraft or .isPrerelease | not)
+          ' <<< "$release" >/dev/null || fail "A published stable GitHub release is required."
+          archive=$(jq -er --arg base "$addon-$version" '
+            [.assets[].name | select(. == ($base + ".zip") or . == ($base + "-forever.zip"))]
+            | select(length == 1) | .[0]
+          ' <<< "$release") || fail "Expected exactly one matching installation ZIP."
+
+          work=$(mktemp -d)
+          trap 'rm -rf "$work"' EXIT
+          gh release download "$RELEASE_TAG" --pattern "$archive" --dir "$work"
+          unzip -tq "$work/$archive"
+          toc=$(unzip -p "$work/$archive" "$addon/$addon.toc")
+          [[ $(awk '/^## Version:/ {print $3; exit}' <<< "$toc" | tr -d '\r') == "$version" ]] ||
+            fail "ZIP TOC version does not match the release tag."
+          interfaces=$(awk '/^## Interface:/ {sub(/^[^:]*:/, ""); print; exit}' <<< "$toc" | tr -d '[:space:]')
+          [[ $interfaces =~ ^[0-9]{5,6}(,[0-9]{5,6})*$ ]] || fail "Invalid ZIP TOC interfaces."
+
+          patches=$(curl --fail --silent --show-error --max-time 20 https://addons.wago.io/api/data/game)
+          jq --arg label "$RELEASE_TAG" '{label: $label, stability: "stable", changelog: .body}' \
+            <<< "$release" > "$work/metadata.json"
+          IFS=, read -ra interface_list <<< "$interfaces"
+          for interface in "${interface_list[@]}"; do
+            case $interface in
+              16???) client=forever ;;
+              [2-9]????|1?????) client=retail ;;
+              *) fail "Unsupported interface: $interface." ;;
+            esac
+            major=${interface:0:${#interface}-4}
+            minor=${interface: -4:2}
+            patch=${interface: -2}
+            game_version="$((10#$major)).$((10#$minor)).$((10#$patch))"
+            jq -e --arg client "$client" --arg version "$game_version" '
+              .patches[$client] | index($version) != null
+            ' <<< "$patches" >/dev/null || fail "Wago does not list $client $game_version."
+            jq --arg field "supported_${client}_patches" --arg version "$game_version" '
+              .[$field] |= ((. // []) + [$version] | unique)
+            ' "$work/metadata.json" > "$work/metadata.next"
+            mv "$work/metadata.next" "$work/metadata.json"
+          done
+
+          echo "Before retrying an upload, check the Wago project for $RELEASE_TAG."
+          status=$(curl --silent --show-error --max-time 90 \
+            --output "$work/response.json" --write-out '%{http_code}' \
+            --header "Authorization: Bearer $WAGO_API_TOKEN" \
+            --header 'Accept: application/json' \
+            --form "metadata=<$work/metadata.json" \
+            --form "file=@$work/$archive;type=application/zip" \
+            "https://addons.wago.io/api/projects/$WAGO_PROJECT_ID/version")
+          [[ $status == 200 || $status == 201 ]] || fail "Wago returned HTTP $status."
+          printf 'Wago accepted %s from %s. Verify the version in https://addons.wago.io/addons/%s.\n' \
+            "$archive" "$RELEASE_TAG" "$WAGO_PROJECT_ID" >> "$GITHUB_STEP_SUMMARY"
