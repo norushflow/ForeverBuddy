@@ -71,7 +71,14 @@ C_CVar = {
 assert(loadfile("Modules/Gather.lua"))("Foreverbuddy", B)
 B.BuildGatherMenu({})
 local tracking, highlight = unpack(buttons)
-assert(writes == 0 and not timer, "both features must be opt-in")
+assert(writes == 0 and not timer)
+B.InitializeGatherHighlight()
+assert(type(B.char.gatherHighlight)=="table" and writes>0, "highlight enabled by default")
+highlight.OnClick(highlight)
+assert(B.char.gatherHighlight==false)
+local beforeInit=writes
+B.InitializeGatherHighlight()
+assert(writes==beforeInit and B.char.gatherHighlight==false, "disabled preference persists")
 
 tracking.OnClick()
 combat = true

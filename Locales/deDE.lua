@@ -182,3 +182,5 @@ addon.L["Suchwechsel gestoppt. Der Client hat den Wechsel nicht bestätigt."] = 
 addon.L["Hervorhebung ist in diesem Client nicht verfügbar."] = "Hervorhebung ist in diesem Client nicht verfügbar."
 addon.L["Einige Hervorhebungsoptionen konnten nicht zurückgesetzt werden."] = "Einige Hervorhebungsoptionen konnten nicht zurückgesetzt werden."
 addon.L["Der Client unterstützt nur einen Teil der Hervorhebungsoptionen."] = "Der Client unterstützt nur einen Teil der Hervorhebungsoptionen."
+
+addon.L["Bankcharakter"] = "Bankcharakter"

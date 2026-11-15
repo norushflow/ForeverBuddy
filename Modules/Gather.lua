@@ -109,7 +109,7 @@ local function toggleHighlight(button)
             Buddy.Message(L["Einige Hervorhebungsoptionen konnten nicht zurückgesetzt werden."])
             return
         end
-        Buddy.char.gatherHighlight = nil
+        Buddy.char.gatherHighlight = false
         button:SetText(L["Hervorhebung: Aus"])
         return
     end
@@ -144,6 +144,12 @@ local function toggleHighlight(button)
     end
     if not applied or partial then
         Buddy.Message(L["Der Client unterstützt nur einen Teil der Hervorhebungsoptionen."])
+    end
+end
+
+function Buddy.InitializeGatherHighlight()
+    if Buddy.char.gatherHighlight == nil then
+        toggleHighlight({SetText = function() end})
     end
 end
 

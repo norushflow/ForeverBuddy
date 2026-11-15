@@ -2,33 +2,20 @@ local _, Buddy = ...
 local L = Buddy.L
 local M = {}
 Buddy.Mail = M
--- Trade-goods subclasses; overlapping materials go only to the selected profession.
+-- Profession masks are shared by the compact, ID-keyed material database.
 M.groups = {
-    {"alchemy", L["Alchemie"], {[9]=true}},
-    {"inscription", L["Inschriftenkunde"], {[9]=true,[16]=true}},
-    {"blacksmith", L["Schmiedekunst"], {[7]=true}},
-    {"engineering", L["Ingenieurskunst"], {[7]=true,[1]=true}},
-    {"jewelcrafting", L["Juwelierskunst"], {[4]=true,[7]=true}},
-    {"leatherworking", L["Lederverarbeitung"], {[6]=true}},
-    {"tailoring", L["Schneiderei"], {[5]=true}},
-    {"enchanting", L["Verzauberkunst"], {[12]=true}},
-    {"cooking", L["Kochkunst"], {[8]=true}},
+    {"alchemy", L["Alchemie"], 1},
+    {"blacksmith", L["Schmiedekunst"], 2},
+    {"engineering", L["Ingenieurskunst"], 4},
+    {"leatherworking", L["Lederverarbeitung"], 8},
+    {"tailoring", L["Schneiderei"], 16},
+    {"enchanting", L["Verzauberkunst"], 32},
+    {"cooking", L["Kochkunst"], 64},
+    {"bank", L["Bankcharakter"], 0},
 }
-function M.Matches(group, class, subclass)
-    return class == 7 and group[3][subclass] == true
-end
--- Instant classification does not require the full item tooltip to be cached.
-function M.ItemClass(itemID)
-    local instant = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
-    if type(instant)=="function" then
-        local _,_,_,_,_,class,subclass = instant(itemID)
-        return class,subclass
-    end
-    local full = C_Item and C_Item.GetItemInfo or GetItemInfo
-    if type(full)=="function" then
-        local _,_,_,_,_,_,_,_,_,_,_,class,subclass = full(itemID)
-        return class,subclass
-    end
+function M.Matches(group, itemID)
+    local mask = itemID and Buddy.MailMaterials[itemID]
+    return mask ~= nil and (group[3] == 0 or math.floor(mask / group[3]) % 2 == 1)
 end
 function Buddy.LoadMail()
     local style = Buddy.Style
@@ -63,17 +50,16 @@ function Buddy.LoadMail()
     local function batch()
         if not opened or InCombatLockdown() then stop(L["Versand beendet: Mailbox geschlossen oder Kampf."]); return end
         if not clean() or GetCursorInfo() then stop(L["Bitte den Briefentwurf und den Mauszeiger zuerst leeren."]); return end
-        if not ((C_Item and (C_Item.GetItemInfoInstant or C_Item.GetItemInfo))
-            or GetItemInfoInstant or GetItemInfo) then
-            stop(L["Gegenstandsdaten sind in diesem Client nicht verfügbar."]); return
-        end
         local n=0
-        for bag=0,(NUM_BAG_SLOTS or 4) do
+        -- Forever has a dedicated reagent bag in addition to ordinary bag slots.
+        local lastBag = math.max(NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4, 5)
+        local reagentBag = Enum and Enum.BagIndex and Enum.BagIndex.ReagentBag
+        if type(reagentBag) == "number" and reagentBag > lastBag then lastBag = reagentBag end
+        for bag=0,lastBag do
             for slot=1,C.GetContainerNumSlots(bag) do
                 local info=C.GetContainerItemInfo(bag,slot)
                 if info and not info.isLocked and not info.isBound then
-                    local class,subclass = M.ItemClass(info.itemID)
-                    if M.Matches(active.group,class,subclass) then
+                    if M.Matches(active.group,info.itemID) then
                         C.PickupContainerItem(bag,slot)
                         ClickSendMailItemButton(n+1)
                         if GetCursorInfo() then ClearCursor(); stop(L["Anhang konnte nicht hinzugefügt werden."]); return end

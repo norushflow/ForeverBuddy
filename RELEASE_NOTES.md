@@ -1,4 +1,6 @@
-# v1.1.12
+# v1.1.13
 
-- Add an opt-in Herbs / Ore switch to the ForeverBuddy panel. It alternates between learned tracking types when the client permits it.
-- Add an experimental Highlighting switch for game-provided interaction icons, outlines, and eligible quest-object sparkles. Visibility depends on the object and client settings.
+- Match profession mail materials by item ID using a local Forever material database, including shared materials and the reagent bag.
+- Offer seven crafting professions and a bank character as recipients while keeping existing supported assignments.
+- Enable gathering highlighting by default; retain an explicitly disabled setting.
+Material data is based on the ForeverTome client archive (build 1.60.1.70707). Historical and incomplete records may be present; some materials may be missing. Source: https://forevertome.com/professions

@@ -183,3 +183,5 @@ addon.L["Suchwechsel gestoppt. Der Client hat den Wechsel nicht bestätigt."] = 
 addon.L["Hervorhebung ist in diesem Client nicht verfügbar."] = "Highlighting is unavailable in this client."
 addon.L["Einige Hervorhebungsoptionen konnten nicht zurückgesetzt werden."] = "Some highlighting settings could not be restored."
 addon.L["Der Client unterstützt nur einen Teil der Hervorhebungsoptionen."] = "The client supports only some highlighting settings."
+
+addon.L["Bankcharakter"] = "Bank character"

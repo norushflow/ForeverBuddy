@@ -33,6 +33,7 @@ events:SetScript("OnEvent",function(_,event,name)
             else Buddy.Toggle() end
         end
     elseif event=="PLAYER_LOGIN" then
+        if Buddy.InitializeGatherHighlight then Buddy.InitializeGatherHighlight() end
         Buddy.CreateMinimap()
         events:UnregisterEvent("PLAYER_LOGIN")
     end
