@@ -86,8 +86,13 @@ SlashCmdList.FOREVERBUDDY('');assert(not Buddy.panel:IsShown())
 -- Character UI regression: compact sizing, filters, sorting and tab transitions.
 function UnitFullName() return 'Buddy','Realm' end
 function UnitFactionGroup() return 'Alliance' end
+function UnitRace() return 'Nachtelf', 'NightElf' end
 function GetProfessions() return nil,nil end
-function GetAverageItemLevel() return 275,275 end
+local itemLevels = {[5]=3, [6]=4, [7]=5, [8]=5, [16]=5}
+function GetInventoryItemID(_, slot) return itemLevels[slot] and slot end
+function GetInventoryItemLink(_, slot) return itemLevels[slot] and tostring(slot) end
+C_Item = C_Item or {}
+function C_Item.GetDetailedItemLevelInfo(link) return itemLevels[tonumber(link)] end
 function UnitLevel() return 90 end
 function UnitXPMax() return 0 end
 function time() return 1000 end
@@ -108,6 +113,9 @@ end
 assert(next(foreverClasses)==nil)
 assert(characters:IsShown() and characters.height==420,'compact character view')
 assert(characters.rows[1].cells[2].text=='Jäger','localized class label')
+assert(characters.rows[1].cells[3].text=='Nachtelf','localized race label')
+assert(Buddy.db.characters.chars['Realm-Buddy'].race=='Nachtelf','race is saved')
+assert(Buddy.db.characters.chars['Realm-Buddy'].ilvl==4, 'average counts only equipped items')
 assert(characters.rows[1].cells[1].text=='Buddy Realm','full name must include secondary name')
 for i=1,20 do Buddy.db.characters.chars['alt'..i]={name='Alt'..i,realm='Realm',class='MAGE',level=i,playtime_sec=i*60} end
 characters.Render();assert(characters.height==630,'row cap at twelve')
@@ -117,8 +125,18 @@ characters.Render();assert(characters.scroll.offset==0 and characters.rows[1]:Is
 Buddy.db.characters.filters.class='WARRIOR'
 characters.Render();assert(characters.empty:IsShown(),'empty filter state')
 characters.clearBtn.scripts.OnClick();assert(not characters.empty:IsShown())
+Buddy.db.characters.chars.alt1.faction='Horde'
+characters.factionButtons[2].scripts.OnClick()
+assert(Buddy.db.characters.filters.faction=='Horde' and characters.rows[1].cells[1].text=='Alt1 Realm' and not characters.rows[2]:IsShown(), 'Horde filter')
+characters.factionButtons[1].scripts.OnClick()
+assert(Buddy.db.characters.filters.faction=='Alliance' and characters.rows[1].cells[1].text=='Buddy Realm' and not characters.rows[2]:IsShown(), 'Alliance filter')
+characters.factionButtons[1].scripts.OnClick()
+assert(not Buddy.db.characters.filters.faction, 'click again clears faction')
+characters.factionButtons[2].scripts.OnClick()
+characters.clearBtn.scripts.OnClick()
+assert(not Buddy.db.characters.filters.faction, 'reset clears faction')
 Buddy.db.characters.chars.alt1.level=2
-characters.headers[6].scripts.OnClick();assert(Buddy.db.characters.sort.key=='level' and Buddy.db.characters.sort.asc)
+characters.headers[7].scripts.OnClick();assert(Buddy.db.characters.sort.key=='level' and Buddy.db.characters.sort.asc)
 assert(characters.rows[1].cells[1].text=='Alt1 Realm' and characters.rows[2].cells[1].text=='Alt2 Realm',
     'numeric ties keep alphabetical ordering')
 characters.headers[1].scripts.OnClick()
@@ -132,6 +150,11 @@ local charEvents
 for _,f in ipairs(frames) do if f.events.SKILL_LINES_CHANGED then charEvents=f end end
 assert(charEvents)
 local c=Buddy.db.characters.chars['Realm-Buddy']
+local originalItemLevel = C_Item.GetDetailedItemLevelInfo
+C_Item.GetDetailedItemLevelInfo = function() return nil end
+charEvents.scripts.OnEvent(charEvents,'PLAYER_LOGIN')
+assert(c.ilvl==4, 'incomplete item data preserves saved average')
+C_Item.GetDetailedItemLevelInfo = originalItemLevel
 local xpReads, restedReads = 0, 0
 local originalXPMax = UnitXPMax
 function UnitXPMax() xpReads=xpReads+1; return 1000 end
@@ -183,7 +206,7 @@ characters.Render()
 local found=false
 for _,row in ipairs(characters.rows) do
  if row:IsShown() and row.cells[1].text=='Offline Realm' then
-  assert(row.cells[8].text=='~15.0%','one day must add estimated rest from zero')
+  assert(row.cells[9].text=='~15.0%','one day must add estimated rest from zero')
   found=true
  end
 end

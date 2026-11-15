@@ -140,9 +140,31 @@ return string.format("%s %d", name, lvl)
 end
 
 -- ---------------- Rest% / iLvl ----------------
+-- Durchschnitt nur über tatsächlich angelegte Ausrüstung, ohne Hemd und Wappenrock.
+local itemSlots = {1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}
+local pendingItems = {}
 local function GetItemLevel()
-local _, equipped = GetAverageItemLevel()
-return math.floor(SafeNum(equipped) + 0.5)
+if not GetInventoryItemID or not GetInventoryItemLink or not C_Item or not C_Item.GetDetailedItemLevelInfo then return nil end
+local total, count = 0, 0
+for _, slot in ipairs(itemSlots) do
+ local id = GetInventoryItemID("player", slot)
+ if not Public(id) then return nil end
+ if id then
+  local link = GetInventoryItemLink("player", slot)
+  if not Public(link) or type(link) ~= "string" then return nil end
+  local level = C_Item.GetDetailedItemLevelInfo(link)
+  if not Public(level) or type(level) ~= "number" then
+   if C_Item.RequestLoadItemDataByID and type(id) == "number" and not pendingItems[id] then
+    pendingItems[id] = true
+    C_Item.RequestLoadItemDataByID(id)
+   end
+   return nil
+  end
+  total, count = total + level, count + 1
+ end
+end
+if count == 0 then return nil end
+return math.floor(total / count + 0.5)
 end
 
 local function GetRestedXPNow()
@@ -185,12 +207,15 @@ if not realm or realm == "" then realm = GetRealmName() or "?" end
 c.realm   = realm
 c.name    = name
 c.class   = select(2, UnitClass("player")) or "?"
+local race = UnitRace("player")
+if race and not (issecretvalue and issecretvalue(race)) and race ~= "" then c.race = race end
 c.faction = UnitFactionGroup("player") or "?"
 
 if not loggingOut then UpdateProfessions(c, skillChanged) end
 
 c.level   = SafeNum(UnitLevel("player"))
-c.ilvl    = SafeNum(GetItemLevel())
+local itemLevel = GetItemLevel()
+if itemLevel then c.ilvl = itemLevel end
 
 c.xpmax = SafeNum(UnitXPMax("player"))
 c.rested_xp = GetRestedXPNow()
@@ -258,6 +283,7 @@ end
 
 local function MatchesFilters(c, flt)
 if flt.class and c.class ~= flt.class then return false end
+if flt.faction and c.faction ~= flt.faction then return false end
 if flt.prof then
 local p1 = c.prof1_name
 local p2 = c.prof2_name
@@ -270,11 +296,12 @@ end
 local ui
 
 local COLS = {
-{ key="name",         title=L["Vor- und Nachname"], w=250 },
-{ key="class",        title=L["Klasse"],    w=110 },
+{ key="name",         title=L["Vor- und Nachname"], w=210 },
+{ key="class",        title=L["Klasse"],    w=100 },
+{ key="race",         title=L["Rasse"],     w=100 },
 { key="faction",      title=L["Fraktion"],  w=90  },
-{ key="prof1",        title=L["Beruf 1"],   w=180 },
-{ key="prof2",        title=L["Beruf 2"],   w=180 },
+{ key="prof1",        title=L["Beruf 1"],   w=150 },
+{ key="prof2",        title=L["Beruf 2"],   w=150 },
 { key="level",        title="Lvl",       w=55  },
 { key="ilvl",         title="iLvl",      w=65  },
 { key="restxp_pct",   title=L["Erholt %"],    w=80  },
@@ -428,9 +455,25 @@ ui.clearBtn:SetPoint("TOPRIGHT", ui, "TOPRIGHT", -32, -106)
 ui.clearBtn:SetText(L["Filter zurücksetzen"])
 ui.clearBtn:SetScript("OnClick", function()
 local flt = EnsureFilters()
-flt.class, flt.prof = nil, nil
+flt.class, flt.prof, flt.faction = nil, nil, nil
 if ui and ui.Render then ui.Render() end
 end)
+
+-- Fraktionsfilter direkt unter dem Zurücksetzen-Knopf.
+ui.factionButtons = {}
+for i, faction in ipairs({"Alliance", "Horde"}) do
+local btn = Style.Button(CreateFrame("Button", nil, filterBg, "UIPanelButtonTemplate"))
+btn:SetSize(70, 24)
+btn:SetPoint("TOPRIGHT", ui.clearBtn, "BOTTOMRIGHT", (i - 2) * 75, -7)
+btn:SetText(L[faction])
+btn:SetScript("OnClick", function()
+ local flt = EnsureFilters()
+ if flt.faction == faction then flt.faction = nil else flt.faction = faction end
+ if ui and ui.Render then ui.Render() end
+end)
+btn.faction = faction
+ui.factionButtons[i] = btn
+end
 
 -- Labels in filter bar
 ui.classLabel = MakeFS(filterBg, "body", Color.gold)
@@ -617,11 +660,16 @@ Style.Select(b, flt.prof == b.profName)
 end
 end
 
-if not flt.class and not flt.prof then return nil end
+for _, b in ipairs(ui.factionButtons) do
+Style.Select(b, flt.faction == b.faction)
+end
+
+if not flt.class and not flt.prof and not flt.faction then return nil end
 
 local parts = {}
 if flt.class then table.insert(parts, L["Klasse="] .. flt.class) end
 if flt.prof  then table.insert(parts, L["Beruf="] .. flt.prof) end
+if flt.faction then table.insert(parts, L["Fraktion"] .. "=" .. L[flt.faction]) end
 return " (" .. table.concat(parts, " | ") .. ")"
 end
 
@@ -810,6 +858,7 @@ local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("PLAYER_LEVEL_UP")
 ev:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+ev:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 ev:RegisterEvent("SKILL_LINES_CHANGED")
 ev:RegisterEvent("TIME_PLAYED_MSG")
 ev:RegisterEvent("UPDATE_EXHAUSTION")
@@ -835,6 +884,10 @@ return
 end
 
 if event=="PLAYER_LOGOUT" then UpdateCharCore(false,true);return end
+if event=="GET_ITEM_INFO_RECEIVED" then
+ if not pendingItems[a1] then return end
+ pendingItems[a1]=nil
+end
 if event=="SKILL_LINES_CHANGED" then skillsChanged=true end
 if event=="PLAYER_XP_UPDATE" and a1~="player" then return end
 if not updateQueued then

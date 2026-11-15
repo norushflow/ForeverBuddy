@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.14
+
+- Show character race and filter the overview by Horde or Alliance.
+- Calculate average item level from equipped items.
+
 ## 1.1.13
 
 - Match profession mail materials by item ID using a local Forever material database, including shared materials and the reagent bag.
