@@ -1,15 +1,17 @@
 name: WowUp Release
 
-on:
-  push:
-    tags:
-      - 'v*'
+on: workflow_dispatch
 
 permissions:
   contents: write
 
+concurrency:
+  group: addon-release
+  cancel-in-progress: false
+
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -18,12 +20,22 @@ jobs:
           persist-credentials: false
 
       - name: Install packaging dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq luajit zip unzip
+        run: |
+          set -euo pipefail
+          missing=()
+          for tool in luajit zip unzip; do
+            command -v "$tool" >/dev/null || missing+=("$tool")
+          done
+          if (( ${#missing[@]} )); then
+            apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+            sudo apt-get "${apt_options[@]}" update -qq --error-on=any
+            sudo apt-get "${apt_options[@]}" install -y -qq "${missing[@]}"
+          fi
 
       - name: Test and package
-        run: ./tools/release.sh --tag "$GITHUB_REF_NAME"
+        run: ./tools/release.sh
 
-      - name: Publish GitHub release
+      - name: Verify and publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -31,5 +43,63 @@ jobs:
           set -euo pipefail
           source tools/addon.sh
           load_addon
-          gh release create "$GITHUB_REF_NAME" "dist/$(package_name "$GITHUB_REF_NAME")" \
-            --verify-tag --title "$title $version" --notes-file RELEASE_NOTES.md
+          tag=v$version
+          zip=$(package_name)
+          repo="repos/$GITHUB_REPOSITORY"
+          export GH_REPO="$GITHUB_REPOSITORY"
+
+          # Include drafts and distinguish an empty result from an API failure.
+          releases=$(gh api --paginate "$repo/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"$tag\") | [.id, .draft, .target_commitish] | @tsv")
+          [[ $releases != *$'\n'* ]] || fail "Mehrere Releases für $tag."
+          IFS=$'\t' read -r release_id draft target <<< "$releases"
+          ref=$(gh api "$repo/git/matching-refs/tags/$tag" \
+            --jq ".[] | select(.ref == \"refs/tags/$tag\") | .ref")
+
+          if [[ $draft == false ]]; then
+            [[ -n $ref && $(gh api "$repo/commits/$tag" --jq .sha) == "$GITHUB_SHA" ]] ||
+              fail "$tag ist bereits für einen anderen Commit veröffentlicht."
+          else
+            [[ -z $ref ]] || fail "$tag existiert bereits ohne passenden veröffentlichten Release."
+            [[ $(gh api "$repo/commits/main" --jq .sha) == "$GITHUB_SHA" ]] ||
+              fail "main wurde seit dem Start aktualisiert. Neuen Lauf von main starten."
+            if [[ -n $release_id ]]; then
+              [[ $target == "$GITHUB_SHA" ]] || fail "Release-Entwurf für $tag zeigt auf einen anderen Commit."
+            else
+              gh release create "$tag" --draft --target "$GITHUB_SHA" \
+                --title "$title $version" --notes-file RELEASE_NOTES.md
+              release_id=$(gh release view "$tag" --json databaseId --jq .databaseId)
+            fi
+            asset=$(gh api --paginate "$repo/releases/$release_id/assets?per_page=100" \
+              --jq ".[] | select(.name == \"$zip\") | [.id, .state] | @tsv")
+            [[ $asset != *$'\n'* ]] || fail "Mehrere Assets mit Namen $zip im Entwurf."
+            IFS=$'\t' read -r asset_id asset_state <<< "$asset"
+            case $asset_state in
+              starter)
+                # A failed GitHub upload can leave an empty placeholder in the draft.
+                gh api --method DELETE "$repo/releases/assets/$asset_id"
+                gh release upload "$tag" "dist/$zip"
+                ;;
+              '') gh release upload "$tag" "dist/$zip" ;;
+              uploaded) ;;
+              *) fail "Unvollständiges Asset $zip im Entwurf." ;;
+            esac
+          fi
+
+          verified=$(mktemp -d)
+          trap 'rm -rf -- "$verified"' EXIT
+          gh release download "$tag" --pattern "$zip" --dir "$verified"
+          cmp -s "dist/$zip" "$verified/$zip" || fail "GitHub-ZIP stimmt nicht mit dem geprüften Paket überein."
+          if [[ $draft != false ]]; then
+            ref=$(gh api "$repo/git/matching-refs/tags/$tag" \
+              --jq ".[] | select(.ref == \"refs/tags/$tag\") | .ref")
+            [[ -z $ref ]] || fail "$tag wurde parallel angelegt."
+            gh release edit "$tag" --draft=false
+          fi
+
+          [[ $(gh release view "$tag" --json isDraft --jq .isDraft) == false &&
+             $(gh api "$repo/commits/$tag" --jq .sha) == "$GITHUB_SHA" ]] ||
+            fail "Veröffentlichter Release oder Tag konnte nicht bestätigt werden."
+          printf '%s\n' "GitHub: $tag, $zip geprüft." \
+            "CurseForge: Projekt ${metadata[x-curse-project-id]}, dasselbe ZIP und RELEASE_NOTES.md verwenden." \
+            >> "$GITHUB_STEP_SUMMARY"

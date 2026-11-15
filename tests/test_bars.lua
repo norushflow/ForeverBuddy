@@ -360,6 +360,12 @@ C_ClickBindings=nil
 assert(B.Apply(true) and B.note:find('Klickzauber konnten nicht geladen'),
     'missing click API reports partial load while bars still load')
 C_ClickBindings=clickAPI
+local setClicks=C_ClickBindings.SetProfileByInfo
+C_ClickBindings.SetProfileByInfo=function() end
+clicks={{type=1,actionID=1943,button="LeftButton",modifiers=0}}
+assert(B.Apply(true) and B.note:find('Klickzauber konnten nicht geladen') and clicks[1].actionID==1943,
+    'silently rejected click update is reported')
+C_ClickBindings.SetProfileByInfo=setClicks
 local oldClicks=profile.clickBindings
 profile.clickBindings=nil
 clicks={{type=1,actionID=133,button="LeftButton",modifiers=0}}

@@ -7,9 +7,22 @@ on:
         description: Published stable GitHub release tag (vX.Y.Z)
         required: true
         type: string
+      dry_run:
+        description: Validate only; do not upload
+        type: boolean
+        default: true
+      confirm_new:
+        description: For an upload, enter the tag after confirming it is absent on Wago
+        required: false
+        type: string
+      recover_status_id:
+        description: Retry only if absent on Wago; enter the uncertain status ID
+        required: false
+        type: string
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
   group: wago-release
@@ -27,20 +40,25 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.tag }}
           WAGO_PROJECT_ID: ${{ vars.WAGO_PROJECT_ID }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          CONFIRM_NEW: ${{ inputs.confirm_new }}
+          RECOVER_STATUS_ID: ${{ inputs.recover_status_id }}
           WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
         run: |
           set -euo pipefail
           fail() { echo "::error::$*"; exit 1; }
 
           [[ $RELEASE_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Use a vX.Y.Z tag."
+          [[ $GH_REPO == norushflow/* ]] || fail "Unexpected repository owner."
           [[ $WAGO_PROJECT_ID =~ ^[A-Za-z0-9]{8}$ ]] || fail "Set the WAGO_PROJECT_ID repository variable."
-          [[ -n $WAGO_API_TOKEN ]] || fail "Set the WAGO_API_TOKEN repository secret."
-
+          [[ $DRY_RUN == true || $DRY_RUN == false ]] || fail "Invalid dry-run setting."
           version=${RELEASE_TAG#v}
           addon=${GH_REPO##*/}
           case $addon in
+            AzerothBuddy|AzerothBuddyUI|BuddyReport|ZygorForeverSkin) ;;
             ForeverBuddy) addon=Foreverbuddy ;;
             ForeverBuddyUI) addon=Foreverbuddyui ;;
+            *) fail "Unknown repository: $GH_REPO." ;;
           esac
 
           release=$(gh release view "$RELEASE_TAG" --json tagName,isDraft,isPrerelease,body,assets)
@@ -59,6 +77,9 @@ jobs:
           toc=$(unzip -p "$work/$archive" "$addon/$addon.toc")
           [[ $(awk '/^## Version:/ {print $3; exit}' <<< "$toc" | tr -d '\r') == "$version" ]] ||
             fail "ZIP TOC version does not match the release tag."
+          toc_project=$(awk '/^## X-Wago-ID:/ {print $3; exit}' <<< "$toc" | tr -d '\r')
+          [[ $toc_project == "$WAGO_PROJECT_ID" || ( -z $toc_project && $DRY_RUN == true ) ]] ||
+            fail "ZIP Wago project ID is missing or does not match this repository."
           interfaces=$(awk '/^## Interface:/ {sub(/^[^:]*:/, ""); print; exit}' <<< "$toc" | tr -d '[:space:]')
           [[ $interfaces =~ ^[0-9]{5,6}(,[0-9]{5,6})*$ ]] || fail "Invalid ZIP TOC interfaces."
 
@@ -85,7 +106,31 @@ jobs:
             mv "$work/metadata.next" "$work/metadata.json"
           done
 
-          echo "Before retrying an upload, check the Wago project for $RELEASE_TAG."
+          if [[ $DRY_RUN == true ]]; then
+            echo "Dry run: $archive, Wago project and client versions verified; no upload." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          [[ -n $WAGO_API_TOKEN ]] || fail "Set the WAGO_API_TOKEN repository secret."
+          [[ $CONFIRM_NEW == "$RELEASE_TAG" ]] ||
+            fail "Check Wago first, then enter $RELEASE_TAG in confirm_new."
+
+          # Reserve this version before POST. An uncertain outcome stays pending and
+          # cannot be retried until a person has checked Wago and resolved it.
+          commit=$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)
+          context="wago-release/$RELEASE_TAG"
+          record=$(gh api --paginate "repos/$GH_REPO/commits/$commit/status?per_page=100" \
+            --jq ".statuses[] | select(.context == \"$context\") | [.state, .id] | @tsv")
+          [[ $record != *$'\n'* ]] || fail "Multiple Wago statuses found."
+          IFS=$'\t' read -r state status_id <<< "$record"
+          case $state in
+            success) echo "Wago upload already recorded for $RELEASE_TAG." >> "$GITHUB_STEP_SUMMARY"; exit 0 ;;
+            '') ;;
+            *) [[ $status_id =~ ^[0-9]+$ && $RECOVER_STATUS_ID == "$status_id" ]] ||
+                 fail "Uncertain Wago upload. Check Wago; if absent, use recover_status_id=$status_id." ;;
+          esac
+          gh api --method POST "repos/$GH_REPO/statuses/$commit" -f state=pending \
+            -f context="$context" -f description='Wago upload started; check before retry' --jq .state >/dev/null
+
           status=$(curl --silent --show-error --max-time 90 \
             --output "$work/response.json" --write-out '%{http_code}' \
             --header "Authorization: Bearer $WAGO_API_TOKEN" \
@@ -94,5 +139,7 @@ jobs:
             --form "file=@$work/$archive;type=application/zip" \
             "https://addons.wago.io/api/projects/$WAGO_PROJECT_ID/version")
           [[ $status == 200 || $status == 201 ]] || fail "Wago returned HTTP $status."
+          gh api --method POST "repos/$GH_REPO/statuses/$commit" -f state=success \
+            -f context="$context" -f description='Wago accepted the upload' --jq .state >/dev/null
           printf 'Wago accepted %s from %s. Verify the version in https://addons.wago.io/addons/%s.\n' \
             "$archive" "$RELEASE_TAG" "$WAGO_PROJECT_ID" >> "$GITHUB_STEP_SUMMARY"

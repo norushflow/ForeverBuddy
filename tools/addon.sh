@@ -17,7 +17,7 @@ regular_path() {
 
 load_addon() {
     shopt -s nullglob
-    local tocs=(*.toc) line key
+    local tocs=(*.toc) line key interface_pattern project wago
     [[ ${#tocs[@]} == 1 ]] || fail 'Genau eine TOC im Addon-Verzeichnis erwartet.'
     toc=${tocs[0]}
     addon=${toc%.toc}
@@ -48,7 +48,16 @@ load_addon() {
     version=${metadata[version]-}
     title=${metadata[title]-}
     [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Ungültige Version in $toc"
-    [[ ${metadata[interface]-} =~ ^[0-9]{5,6}$ ]] || fail "Ungültiges Interface in $toc"
+    case $addon in
+        AzerothBuddy)   interface_pattern='^12[0-9]{4}$'; project=1791270; wago=kNMPpOGz ;;
+        AzerothBuddyUI) interface_pattern='^12[0-9]{4}$'; project=1791306; wago=96EX98Ng ;;
+        Foreverbuddy)   interface_pattern='^16[0-9]{3}$'; project=1791314; wago=QKyq35K7 ;;
+        Foreverbuddyui) interface_pattern='^16[0-9]{3}$'; project=1791315; wago=E6gzORN1 ;;
+        *) fail "Unbekanntes Addon: $addon" ;;
+    esac
+    [[ ${metadata[interface]-} =~ $interface_pattern ]] || fail "Interface passt nicht zu $addon: $toc"
+    [[ ${metadata[x-curse-project-id]-} == "$project" ]] || fail "Falsche CurseForge-Projekt-ID in $toc"
+    [[ ${metadata[x-wago-id]-} == "$wago" ]] || fail "Falsche Wago-Projekt-ID in $toc"
 }
 
 release_notes() {
@@ -60,8 +69,28 @@ release_notes() {
     ' CHANGELOG.md
 }
 
+load_media() {
+    local icon path
+    icon=${metadata[icontexture]-}
+    icon=${icon//\\/\/}
+    [[ $icon == "Interface/AddOns/$addon/Media/"* ]] || fail "Ungültiger IconTexture-Pfad in $toc."
+    icon=${icon#"Interface/AddOns/$addon/"}
+    [[ $icon == *.tga ]] || icon+=.tga
+    regular_path "$icon" && [[ -s $icon ]] || fail "TOC-Icon fehlt oder ist ungültig: $icon"
+    media=("$icon")
+    case $addon in
+        AzerothBuddyUI|Foreverbuddyui) media+=(Media/BuddyIcon.png Media/Selection.tga) ;;
+    esac
+    if [[ $addon == Foreverbuddyui ]]; then
+        media+=(Media/UnitMasks/{148x28,220x18,240x38,260x18,264x18,296x22,300x46,56x58}.tga)
+    fi
+    for path in "${media[@]}"; do
+        regular_path "$path" && [[ -s $path ]] || fail "Paketdatei fehlt oder ist ungültig: $path"
+    done
+}
+
 validate_release_metadata() {
-    local account="${addon}DB" character="${addon}CharDB" key heading versions icon path
+    local account="${addon}DB" character="${addon}CharDB" key heading path
     [[ $addon != AzerothBuddyUI ]] || account=$addon
     [[ ${metadata[savedvariables]-} == "$account" &&
         ${metadata[savedvariablespercharacter]-} == "$character" ]] ||
@@ -73,53 +102,22 @@ validate_release_metadata() {
                 fail "Unerwartete Ladeabhängigkeit in $toc: $key" ;;
         esac
     done
-    [[ ${metadata[x-curse-project-id]-} =~ ^[1-9][0-9]*$ &&
-        -n ${metadata[notes]-} && -n ${metadata[notes-dede]-} ]] ||
-        fail "CurseForge-ID oder Beschreibung fehlt in $toc."
+    [[ -n ${metadata[notes]-} && -n ${metadata[notes-dede]-} ]] || fail "Beschreibung fehlt in $toc."
     [[ -n $title ]] || fail "Titel fehlt in $toc."
     IFS= read -r heading < README.md || fail "README-Kopf fehlt."
     [[ ${heading%$'\r'} == "# $title $version" ]] || fail "README-Version passt nicht zu $toc."
-    release_notes >/dev/null || fail "Changelog-Abschnitt für $version fehlt oder ist mehrdeutig."
 
-    if [[ $addon == *[Uu][Ii] ]]; then
-        versions=$(sed -nE 's/^UI\.VERSION[[:blank:]]*=[[:blank:]]*"([^"]+)".*/\1/p' Core.lua)
-        [[ $versions == "$version" ]] || fail "UI.VERSION passt nicht zu $toc."
-        for path in Core.lua Locales/enUS.lua Locales/deDE.lua; do
-            versions=$(sed -nE 's/.*"Version ([0-9]+\.[0-9]+\.[0-9]+) .*".*/\1/p' "$path")
-            [[ -n $versions ]] ||
-                fail "Versionsmeldung in $path passt nicht zu $toc."
-            while IFS= read -r key; do
-                [[ $key == "$version" ]] || fail "Versionsmeldung in $path passt nicht zu $toc."
-            done <<< "$versions"
-        done
-    fi
-
-    icon=${metadata[icontexture]-}
-    icon=${icon//\\/\/}
-    [[ $icon == "Interface/AddOns/$addon/Media/"* ]] || fail "Ungültiger IconTexture-Pfad in $toc."
-    icon=${icon#"Interface/AddOns/$addon/"}
-    [[ $icon == *.tga ]] || icon+=.tga
-    regular_path "$icon" && [[ -s $icon ]] || fail "TOC-Icon fehlt oder ist ungültig: $icon"
-    local assets=()
-    case $addon in
-        AzerothBuddyUI|Foreverbuddyui) assets=(Media/BuddyIcon.png Media/Selection.tga) ;;
-    esac
-    if [[ $addon == Foreverbuddyui ]]; then
-        assets+=(Media/UnitMasks/{148x28,220x18,240x38,260x18,264x18,296x22,300x46,56x58}.tga)
-    fi
-    for path in "${assets[@]}"; do
-        regular_path "$path" && [[ -s $path ]] || fail "Paketdatei fehlt oder ist ungültig: $path"
-    done
+    load_media
     [[ ! -f Style.lua || -f THIRD_PARTY.md ]] || fail 'Herkunftshinweise fehlen (THIRD_PARTY.md).'
 
-    local notes_heading
-    IFS= read -r notes_heading < RELEASE_NOTES.md || fail 'RELEASE_NOTES.md fehlt oder ist leer.'
-    [[ $notes_heading == "# v$version" ]] && grep -Eq '^- [^[:space:]]' RELEASE_NOTES.md ||
-        fail "RELEASE_NOTES.md muss zu v$version passen und Stichpunkte enthalten."
+    local notes
+    notes=$(release_notes) || fail "Changelog-Abschnitt für $version fehlt oder ist mehrdeutig."
+    diff -q <(printf '# v%s\n\n%s\n' "$version" "$notes") RELEASE_NOTES.md >/dev/null ||
+        fail "RELEASE_NOTES.md weicht vom Changelog für v$version ab."
 
     awk -v addon="$addon" '
         BEGIN {
-            split("AGENTS.md CHANGELOG.md DEVELOPMENT.md README.md RELEASE_NOTES.md SECURITY.md TEMP branding dist tests tools", required)
+            split("AGENTS.md CHANGELOG.md DEVELOPMENT.md README.md RELEASE_NOTES.md SECURITY.md TEMP branding dist tests tools Media/Expressway.ttf Media/MORPHEUS.TTF", required)
             for (i in required) allowed[required[i]] = 1
             allowed["docs"] = allowed["OMNIUM_PROFILES.md"] = 1
         }
@@ -148,6 +146,6 @@ validate_release_metadata() {
 
 package_name() {
     local suffix=
-    if [[ -n ${1-} && $addon == Forever* ]]; then suffix=-forever; fi
+    if [[ $addon == Forever* ]]; then suffix=-forever; fi
     printf '%s-%s%s.zip\n' "$addon" "$version" "$suffix"
 }

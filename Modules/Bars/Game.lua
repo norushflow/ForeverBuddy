@@ -333,5 +333,17 @@ function B.ApplyClickBindings(profile,shared)
     local complete=true
     if shared then info,complete=sharedClickBindings(profile,info) end
     if not info or B.Reason() then return false end
-    return pcall(C_ClickBindings.SetProfileByInfo,info) and complete
+    local expected=B.CopyClickBindings(info)
+    if not pcall(C_ClickBindings.SetProfileByInfo,info) or not complete then return false end
+    local actual=B.ReadClickBindings()
+    if not actual or #actual~=#expected then return false end
+    local byChord={}
+    for _,binding in ipairs(actual) do
+        byChord[binding.button..":"..binding.modifiers]=binding
+    end
+    for _,binding in ipairs(expected) do
+        local current=byChord[binding.button..":"..binding.modifiers]
+        if not current or current.type~=binding.type or current.actionID~=binding.actionID then return false end
+    end
+    return true
 end

@@ -3,6 +3,8 @@ manual-changelog:
   filename: RELEASE_NOTES.md
   markup-type: markdown
 ignore:
+  - Media/Expressway.ttf
+  - Media/MORPHEUS.TTF
   - RELEASE_NOTES.md
   - AGENTS.md
   - CHANGELOG.md

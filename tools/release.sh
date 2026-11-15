@@ -18,7 +18,7 @@ done
 
 load_addon
 [[ -z $tag || $tag == "v$version" ]] || fail "Git-Tag muss v$version entsprechen."
-out="$output/$(package_name "$tag")"
+out="$output/$(package_name)"
 [[ ! -e $out && ! -L $out ]] || fail "ZIP existiert bereits: $out"
 ./tools/check.sh --full
 
@@ -26,11 +26,8 @@ mkdir -p -- "$output"
 stage=$(mktemp -d -- "$output/.package.XXXXXXXX")
 trap 'rm -rf -- "$stage"' EXIT
 mkdir -- "$stage/$addon"
-media=$(find Media -type f \( -iname '*.png' -o -iname '*.tga' -o -iname '*.ttf' \) -print)
-files=("$toc" "${entries[@]}")
-while IFS= read -r path; do
-    [[ -z $path ]] || files+=("$path")
-done <<< "$media"
+load_media
+files=("$toc" "${entries[@]}" "${media[@]}")
 for notice in LICENSE* THIRD_PARTY.md; do
     if [[ -f $notice && ! -L $notice ]]; then files+=("$notice"); fi
 done
@@ -47,6 +44,9 @@ cp --parents -- "${files[@]}" "$stage/$addon/"
     find "$addon" -type f -exec touch -t 198001010000.00 {} +
     find "$addon" -type f -print | sort | ZIPOPT= zip -q -X -9 addon.zip -@
     unzip -tq addon.zip >/dev/null
+    diff -q <(find "$addon" -type f -print | sort) <(unzip -Z -1 addon.zip | sort) >/dev/null ||
+        fail 'ZIP-Inhalt stimmt nicht mit den geprüften Paketdateien überein.'
+    unzip -p addon.zip "$addon/$toc" | cmp -s "$addon/$toc" - || fail 'TOC im ZIP stimmt nicht überein.'
 )
 ln -T -- "$stage/addon.zip" "$out"
 printf 'Installations-ZIP: %s\n' "$out"
