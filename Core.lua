@@ -99,14 +99,23 @@ function Buddy.Toggle()
                 panel:SetScale(math.min(1, (width - 40) / 390, (availableHeight - 40) / height))
             end
         end
-        if barsMenu then
-            local height = Buddy.Bars.BuildMenu(panel,hintTop,fitFooter)
-            hint:SetPoint("TOPLEFT",Buddy.Bars.menu,"BOTTOMLEFT",0,-hintGap)
-            fitFooter(height)
-        else
-            hint:SetPoint("TOPLEFT",22,hintTop)
-            fitFooter(0)
+        local gather = Buddy.BuildGatherMenu and Buddy.BuildGatherMenu(panel)
+        local function fitMenu(barsHeight)
+            fitFooter(barsHeight + (gather and 34 or 0))
         end
+        local anchor, height
+        if barsMenu then
+            height = Buddy.Bars.BuildMenu(panel,hintTop,fitMenu)
+            anchor = Buddy.Bars.menu
+        end
+        if gather then
+            if anchor then gather:SetPoint("TOPLEFT",anchor,"BOTTOMLEFT",0,-8)
+            else gather:SetPoint("TOPLEFT",22,hintTop) end
+            anchor = gather
+        end
+        if anchor then hint:SetPoint("TOPLEFT",anchor,"BOTTOMLEFT",0,-hintGap)
+        else hint:SetPoint("TOPLEFT",22,hintTop) end
+        fitMenu(height or 0)
         local reload = style.Button(CreateFrame("Button",nil,panel,"UIPanelButtonTemplate"))
         reload:SetSize(200,24); reload:SetPoint("BOTTOM",0,12)
         reload:SetText(L["Oberfläche neu laden"])

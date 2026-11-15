@@ -170,3 +170,16 @@ addon.L = {
 }
 
 addon.L["Charakter-Sicherung durch ForeverBuddyUI"] = "Character backup managed by ForeverBuddyUI"
+
+addon.L["Kräuter / Erz: Aus"] = "Herbs / Ore: Off"
+addon.L["Kräuter / Erz: An"] = "Herbs / Ore: On"
+addon.L["Hervorhebung: Aus"] = "Highlighting: Off"
+addon.L["Hervorhebung: An"] = "Highlighting: On"
+addon.L["Minimap-Suche ist in diesem Client nicht verfügbar."] = "Minimap tracking is unavailable in this client."
+addon.L["Kräuter- und Erzsuche müssen beide erlernt sein."] = "Find Herbs and Find Minerals must both be learned."
+addon.L["Beide Sucharten sind aktiv."] = "Both tracking types are active."
+addon.L["Eine andere Suchart ist aktiv."] = "Another tracking type is active."
+addon.L["Suchwechsel gestoppt. Der Client hat den Wechsel nicht bestätigt."] = "Tracking stopped. The client did not confirm the switch."
+addon.L["Hervorhebung ist in diesem Client nicht verfügbar."] = "Highlighting is unavailable in this client."
+addon.L["Einige Hervorhebungsoptionen konnten nicht zurückgesetzt werden."] = "Some highlighting settings could not be restored."
+addon.L["Der Client unterstützt nur einen Teil der Hervorhebungsoptionen."] = "The client supports only some highlighting settings."

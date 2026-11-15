@@ -1,4 +1,4 @@
-# v1.1.11
+# v1.1.12
 
-- Verify restored native click-casting bindings and report updates rejected by the client.
-- Add Wago project metadata and strengthen release package validation.
+- Add an opt-in Herbs / Ore switch to the ForeverBuddy panel. It alternates between learned tracking types when the client permits it.
+- Add an experimental Highlighting switch for game-provided interaction icons, outlines, and eligible quest-object sparkles. Visibility depends on the object and client settings.
