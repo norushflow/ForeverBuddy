@@ -15,7 +15,7 @@ M.groups = {
 }
 function M.Matches(group, itemID)
     local mask = itemID and Buddy.MailMaterials[itemID]
-    return mask ~= nil and (group[3] == 0 or math.floor(mask / group[3]) % 2 == 1)
+    return mask ~= nil and (group[3] == 0 or mask == group[3])
 end
 function Buddy.LoadMail()
     local style = Buddy.Style
@@ -38,43 +38,77 @@ function Buddy.LoadMail()
         active, pending, delay, timeout = nil, nil, nil, nil
         if text then note(text) end
     end
-    local function occupied()
-        for i=1,(ATTACHMENTS_MAX_SEND or 12) do
-            if GetSendMailItem(i) then return true end
-        end
-        return false
+    local function attachment(slot)
+        local name, itemID, _, count = GetSendMailItem(slot)
+        local link = GetSendMailItemLink and GetSendMailItemLink(slot)
+        local present = name or itemID or link or (HasSendMailItem and HasSendMailItem(slot))
+        return present, itemID, count
     end
-    local function clean()
-        return not occupied() and (GetSendMailMoney() or 0)==0 and (GetSendMailCOD() or 0)==0
+    local function hasMoney()
+        return (GetSendMailMoney() or 0) ~= 0 or (GetSendMailCOD() or 0) ~= 0
     end
     local function batch()
         if not opened or InCombatLockdown() then stop(L["Versand beendet: Mailbox geschlossen oder Kampf."]); return end
-        if not clean() or GetCursorInfo() then stop(L["Bitte den Briefentwurf und den Mauszeiger zuerst leeren."]); return end
-        local n=0
-        -- Forever has a dedicated reagent bag in addition to ordinary bag slots.
-        local lastBag = math.max(NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4, 5)
-        local reagentBag = Enum and Enum.BagIndex and Enum.BagIndex.ReagentBag
-        if type(reagentBag) == "number" and reagentBag > lastBag then lastBag = reagentBag end
-        for bag=0,lastBag do
-            for slot=1,C.GetContainerNumSlots(bag) do
-                local info=C.GetContainerItemInfo(bag,slot)
-                if info and not info.isLocked and not info.isBound then
-                    if M.Matches(active.group,info.itemID) then
-                        C.PickupContainerItem(bag,slot)
-                        ClickSendMailItemButton(n+1)
-                        if GetCursorInfo() then ClearCursor(); stop(L["Anhang konnte nicht hinzugefügt werden."]); return end
-                        if not GetSendMailItem(n+1) then stop(L["Anhang nicht bestätigt. Bitte Brief prüfen."]); return end
-                        n=n+1
-                        if n >= (ATTACHMENTS_MAX_SEND or 12) then break end
+        local maxAttachments = ATTACHMENTS_MAX_SEND or 12
+        local draftWarning = L["Bitte den Briefentwurf und den Mauszeiger zuerst leeren."]
+        local attachmentWarning = L["Anhang nicht bestätigt. Bitte Brief prüfen."]
+        if hasMoney() or GetCursorInfo() then stop(draftWarning); return end
+        for slot = 1, maxAttachments do
+            if attachment(slot) then stop(draftWarning); return end
+        end
+
+        local job = active
+        local expected = {}
+        local bags = {}
+        local lastBag = NUM_BAG_SLOTS or 4
+        for bag = 0, lastBag do bags[#bags + 1] = bag end
+        local reagentBag = Enum and Enum.BagIndex and Enum.BagIndex.ReagentBag or 5
+        if reagentBag > lastBag then bags[#bags + 1] = reagentBag end
+        for _, bag in ipairs(bags) do
+            for slot = 1, C.GetContainerNumSlots(bag) do
+                local info = C.GetContainerItemInfo(bag, slot)
+                if info and not info.isLocked and not info.isBound and M.Matches(job.group, info.itemID) then
+                    local index = #expected + 1
+                    local itemID, count = info.itemID, info.stackCount
+                    if GetCursorInfo() or attachment(index) then stop(draftWarning); return end
+                    C.PickupContainerItem(bag, slot)
+                    local cursorType, cursorItemID = GetCursorInfo()
+                    if cursorType ~= "item" or cursorItemID ~= itemID or attachment(index) then
+                        if cursorType then ClearCursor() end
+                        stop(L["Anhang konnte nicht hinzugefügt werden."])
+                        return
                     end
+                    ClickSendMailItemButton(index)
+                    if GetCursorInfo() then ClearCursor(); stop(L["Anhang konnte nicht hinzugefügt werden."]); return end
+                    local present, attachedID, attachedCount = attachment(index)
+                    if not present or attachedID ~= itemID or attachedCount ~= count or not count or count < 1 then
+                        stop(attachmentWarning)
+                        return
+                    end
+                    expected[index] = {itemID = itemID, count = count}
+                    if index == maxAttachments then break end
                 end
             end
-            if n >= (ATTACHMENTS_MAX_SEND or 12) then break end
+            if #expected == maxAttachments then break end
         end
-        if n==0 then stop(L["Versand abgeschlossen. Keine weiteren passenden, versendbaren Materialien gefunden."]); return end
-        if GetMoney() < n*30 then stop(L["Nicht genügend Gold für das Porto. Anhänge bleiben im Entwurf."]); return end
-        pending,timeout=true,0
-        SendMail(active.recipient,L["Materialien: "]..active.group[2],L["Gesendet mit ForeverBuddy"])
+
+        if active ~= job then return end
+        if #expected == 0 then stop(L["Versand abgeschlossen. Keine weiteren passenden, versendbaren Materialien gefunden."]); return end
+        if hasMoney() or GetCursorInfo() then stop(draftWarning); return end
+        -- Recheck the entire draft, including slots this batch never filled.
+        for index = 1, maxAttachments do
+            local present, itemID, count = attachment(index)
+            local stack = expected[index]
+            if stack then
+                if not present or itemID ~= stack.itemID or count ~= stack.count then stop(attachmentWarning); return end
+            elseif present then
+                stop(attachmentWarning)
+                return
+            end
+        end
+        if GetMoney() < #expected * 30 then stop(L["Nicht genügend Gold für das Porto. Anhänge bleiben im Entwurf."]); return end
+        pending, timeout = true, 0
+        SendMail(job.recipient, L["Materialien: "]..job.group[2], L["Gesendet mit ForeverBuddy"])
     end
     local function updateSend(_, elapsed)
         if timeout then

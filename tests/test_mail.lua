@@ -7,65 +7,195 @@ assert(#M.groups==8 and M.groups[8][1]=='bank')
 local found={}
 for _,g in ipairs(M.groups) do found[g[1]]=true end
 assert(not found.inscription and not found.jewelcrafting and not found.mining and not found.herbalism)
-local counts={0,0,0,0,0,0,0}; local multi=0
-for id in pairs(B.MailMaterials) do
-    local n=0
-    for i=1,7 do if M.Matches(M.groups[i],id) then counts[i]=counts[i]+1; n=n+1 end end
-    assert(M.Matches(M.groups[8],id)); if n>1 then multi=multi+1 end
+local counts = {0, 0, 0, 0, 0, 0, 0}
+local bankOnly = 0
+for id, mask in pairs(B.MailMaterials) do
+    local matches = 0
+    for i = 1, 7 do
+        local group = M.groups[i]
+        assert(M.Matches(group, id) == (group[3] == mask))
+        if M.Matches(group, id) then
+            counts[i] = counts[i] + 1
+            matches = matches + 1
+        end
+        assert(not M.Matches(group, 999999999) and not M.Matches(group, nil))
+    end
+    assert(M.Matches(M.groups[8], id) and matches <= 1)
+    if matches == 0 then bankOnly = bankOnly + 1 end
 end
-for _,n in ipairs(counts) do assert(n>0) end
-assert(multi>0 and not M.Matches(M.groups[8],999999999) and not M.Matches(M.groups[8],nil))
-assert(M.Matches(M.groups[4],2934) and M.Matches(M.groups[8],2934), 'ruined leather scraps must match leatherworking and bank')
-local events, sent, attached, items={},0,{},{{itemID=765},{itemID=765,isBound=true},{itemID=765,isLocked=true}}
-function CreateFrame() return {RegisterEvent=function() end,SetScript=function(_,k,v) events[k]=v end} end
-SlashCmdList={}
-C_Container={GetContainerNumSlots=function(b) return b==(bagUnderTest or 0) and #items or 0 end,
-GetContainerItemInfo=function(_,s) return items[s] end,
-PickupContainerItem=function(b,s) attached.pick=s; attached.bag=b end}
-function GetSendMailItem(i) return attached[i] end
-function ClickSendMailItemButton(i) attached[i]=true end
-function GetSendMailMoney() return 0 end
-GetSendMailCOD=GetSendMailMoney
-function GetCursorInfo() end
+for _, count in ipairs(counts) do assert(count > 0) end
+assert(bankOnly > 0 and not M.Matches(M.groups[8], 999999999) and not M.Matches(M.groups[8], nil))
+
+local function stack(itemID, count)
+    return {itemID = itemID, stackCount = count or 1}
+end
+
+local events, sent, draft, bags = {}, {}, {}, {}
+local cursor, money, cod, onAttach, pickupOverride
+local visited
+function CreateFrame()
+    return {RegisterEvent = function() end, SetScript = function(_, key, script) events[key] = script end}
+end
+SlashCmdList = {}
+C_Container = {
+    GetContainerNumSlots = function(bag)
+        visited[bag] = true
+        return bags[bag] and bags[bag].size or 0
+    end,
+    GetContainerItemInfo = function(bag, slot) return bags[bag][slot] end,
+    PickupContainerItem = function(bag, slot)
+        cursor = pickupOverride or bags[bag][slot]
+        bags[bag][slot] = nil
+    end,
+}
+function GetSendMailItem(index)
+    local item = draft[index]
+    if item and not item.hidden then
+        return 'Item', item.itemID, 123, item.stackCount, 1
+    end
+end
+function HasSendMailItem(index) return draft[index] ~= nil end
+function ClickSendMailItemButton(index)
+    assert(cursor and not draft[index])
+    draft[index], cursor = cursor, nil
+    if onAttach then onAttach(index) end
+end
+function GetSendMailMoney() return money end
+function GetSendMailCOD() return cod end
+function GetCursorInfo()
+    if cursor then return 'item', cursor.itemID end
+end
+function ClearCursor() cursor = nil end
 function GetMoney() return 10000 end
 function UnitName() return 'Main' end
 function InCombatLockdown() return false end
-function SendMail(recipient) assert(recipient=='Alt'); sent=sent+1 end
-local faction='Horde'
+function SendMail(recipient)
+    sent[#sent + 1] = {recipient = recipient, items = draft}
+end
+local faction = 'Horde'
 function UnitFactionGroup() return faction end
-function UnitFullName() return 'Main','Family' end
-B.LoadMail(); local openPanel=M.Open; M.Open=function() end
-M.Start(M.groups[1]); assert(sent==0 and not events.OnUpdate)
-events.OnEvent(nil,'MAIL_SHOW'); faction='Alliance'; M.Start(M.groups[1]); assert(sent==0 and not events.OnUpdate)
-faction='Horde'; M.Start(M.groups[1]); assert(sent==1 and attached[1] and not attached[2] and events.OnUpdate)
-M.Start(M.groups[1]); assert(sent==1)
-events.OnEvent(nil,'MAIL_FAILED'); assert(sent==1 and not events.OnUpdate)
-attached={}; M.Start(M.groups[1]); assert(sent==2)
-attached={}; events.OnEvent(nil,'MAIL_SEND_SUCCESS')
-events.OnUpdate(nil,.5); assert(sent==2)
-events.OnUpdate(nil,.5); assert(sent==3)
-items={}; attached={}; events.OnEvent(nil,'MAIL_SEND_SUCCESS')
-events.OnUpdate(nil,1); assert(sent==3 and not events.OnUpdate)
-items={{itemID=765}}; M.Start(M.groups[1]); assert(sent==4)
-events.OnUpdate(nil,16); assert(sent==4 and not events.OnUpdate)
-attached={}; M.Start(M.groups[1]); assert(sent==5)
-events.OnEvent(nil,'PLAYER_REGEN_DISABLED'); assert(sent==5 and not events.OnUpdate)
-attached={}; M.Start(M.groups[1]); assert(sent==6)
-events.OnEvent(nil,'MAIL_CLOSED'); M.Start(M.groups[1]); assert(sent==6 and not events.OnUpdate)
-items={{itemID=2934},{itemID=2934,isBound=true},{itemID=2934,isLocked=true}}
-attached={}; events.OnEvent(nil,'MAIL_SHOW'); M.Start(M.groups[4])
-assert(sent==7 and attached[1] and not attached[2] and attached.pick==1,
-    'ruined leather scraps should be attached for leatherworking while bound and locked stacks are excluded')
-events.OnEvent(nil,'MAIL_FAILED')
--- Material bag 5 can exist beyond the four normal equipped bag slots.
-NUM_BAG_SLOTS=4; Enum={BagIndex={ReagentBag=5}}; bagUnderTest=5
-items={{itemID=2934}}; attached={}; M.Start(M.groups[4])
-assert(sent==8 and attached[1] and attached.bag==5, 'search the dedicated reagent bag')
-events.OnEvent(nil,'MAIL_FAILED'); Enum=nil; attached={}; M.Start(M.groups[4])
-assert(sent==9 and attached.bag==5, 'search the reagent bag even if its enum is unavailable')
-events.OnEvent(nil,'MAIL_FAILED'); events.OnEvent(nil,'MAIL_CLOSED')
-bagUnderTest=nil; Enum=nil; NUM_BAG_SLOTS=nil
-print('PASS: mail groups, guards, batching, idle cleanup, failure, timeout and completion')
+function UnitFullName() return 'Main', 'Family' end
+B.LoadMail()
+local openPanel = M.Open
+M.Open = function() end
+
+local function event(name) events.OnEvent(nil, name) end
+local function reset()
+    event('MAIL_CLOSED')
+    event('MAIL_SHOW')
+    sent, draft, bags, visited = {}, {}, {}, {}
+    cursor, money, cod, onAttach, pickupOverride = nil, nil, nil, nil, nil
+end
+local function assertDraft(index, itemID, count)
+    local item = sent[#sent].items[index]
+    assert(item and item.itemID == itemID and item.stackCount == (count or 1))
+end
+
+M.Start(M.groups[1]); assert(#sent == 0 and not events.OnUpdate)
+reset()
+faction = 'Alliance'; M.Start(M.groups[1]); assert(#sent == 0 and not events.OnUpdate)
+faction = 'Horde'
+
+-- Every recipient gets only its own allowlisted materials, including with a mixed bag.
+local samples = {765, 3470, 4359, 2934, 2589, 10940, 723}
+local blocked = {2770, 2840, 12809, 2320, 8153}
+for i, group in ipairs(M.groups) do
+    B.db.mail.recipientsByFaction.Horde[group[1]] = group[1] .. ' Alt'
+    reset()
+    local bag = {size = #samples + #blocked + 1, [1] = stack(999999999)}
+    for slot, id in ipairs(samples) do bag[slot + 1] = stack(id, slot) end
+    for slot, id in ipairs(blocked) do bag[#samples + slot + 1] = stack(id) end
+    bags[0] = bag
+    M.Start(group)
+    assert(#sent == 1 and sent[1].recipient == group[1] .. ' Alt')
+    if i <= #samples then
+        assertDraft(1, samples[i], i)
+        assert(not draft[2])
+    else
+        for slot, id in ipairs(samples) do assertDraft(slot, id, slot) end
+        for slot = 1, #blocked do assertDraft(#samples + slot, blocked[slot]) end
+        assert(#draft == 12 and bags[0][1].itemID == 999999999)
+    end
+end
+
+-- Separate stacks, holes, skipped slots and the actual attachment limit.
+reset()
+NUM_BAG_SLOTS = 4
+ATTACHMENTS_MAX_SEND = 2
+Enum = {BagIndex = {ReagentBag = 7}}
+bags[0] = {size = 7, [1] = stack(2934, 3), [3] = stack(2934, 19),
+    [4] = {itemID = 2934, stackCount = 4, isBound = true},
+    [5] = {itemID = 2934, stackCount = 5, isLocked = true},
+    [6] = stack(2770), [7] = stack(2318, 2)}
+bags[7] = {size = 1, stack(8170, 8)}
+M.Start(M.groups[4])
+assert(#sent == 1 and events.OnUpdate)
+assertDraft(1, 2934, 3)
+assertDraft(2, 2934, 19)
+M.Start(M.groups[4]); assert(#sent == 1)
+draft = {}
+event('MAIL_SEND_SUCCESS')
+events.OnUpdate(nil, .5); assert(#sent == 1)
+events.OnUpdate(nil, .5); assert(#sent == 2)
+assertDraft(1, 2318, 2)
+assertDraft(2, 8170, 8)
+assert(not visited[5] and not visited[6] and visited[7])
+draft = {}
+event('MAIL_SEND_SUCCESS')
+events.OnUpdate(nil, 1); assert(#sent == 2 and not events.OnUpdate)
+
+reset()
+Enum, ATTACHMENTS_MAX_SEND = nil, nil
+bags[5] = {size = 1, stack(2934)}
+M.Start(M.groups[4]); assert(#sent == 1 and visited[5])
+event('MAIL_FAILED'); assert(not events.OnUpdate)
+reset()
+bags[0] = {size = 1, stack(2934)}
+M.Start(M.groups[4])
+events.OnUpdate(nil, 16); assert(#sent == 1 and not events.OnUpdate)
+reset()
+bags[0] = {size = 1, stack(2934)}
+M.Start(M.groups[4])
+event('PLAYER_REGEN_DISABLED'); assert(#sent == 1 and not events.OnUpdate)
+event('MAIL_CLOSED'); M.Start(M.groups[4]); assert(#sent == 1 and not events.OnUpdate)
+
+local function rejectsDraft(setup)
+    reset()
+    bags[0] = {size = 2, stack(2934, 4), stack(2318)}
+    setup()
+    M.Start(M.groups[4])
+    assert(#sent == 0 and not events.OnUpdate)
+end
+rejectsDraft(function() draft[12] = {hidden = true} end)
+assert(draft[12])
+rejectsDraft(function() money = 1 end)
+rejectsDraft(function() cod = 1 end)
+rejectsDraft(function() cursor = stack(2770) end)
+assert(cursor.itemID == 2770)
+rejectsDraft(function() pickupOverride = stack(2770, 4) end)
+assert(not cursor and not draft[1])
+rejectsDraft(function() onAttach = function() draft[1] = stack(2770, 4) end end)
+rejectsDraft(function() onAttach = function() draft[1].stackCount = 1 end end)
+rejectsDraft(function() onAttach = function() draft[1].hidden = true end end)
+rejectsDraft(function() onAttach = function() draft[12] = stack(2770) end end)
+rejectsDraft(function()
+    onAttach = function(index)
+        if index == 2 then draft[1] = stack(2770, 4) end
+    end
+end)
+rejectsDraft(function() onAttach = function() cod = 1 end end)
+
+-- A draft that still has attachments after a success event must not be resent.
+reset()
+bags[0] = {size = 2, stack(2934), stack(2318)}
+ATTACHMENTS_MAX_SEND = 1
+M.Start(M.groups[4]); assert(#sent == 1)
+event('MAIL_SEND_SUCCESS')
+events.OnUpdate(nil, 1)
+assert(#sent == 1 and not events.OnUpdate and bags[0][2].itemID == 2318)
+ATTACHMENTS_MAX_SEND, NUM_BAG_SLOTS = nil, nil
+event('MAIL_CLOSED')
+print('PASS: all mail recipients, exclusive routing, mixed bags, stack integrity, drafts and batching')
 
 -- Exercise the actual positioning path with an existing panel.
 UIParent={}
