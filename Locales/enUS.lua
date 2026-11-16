@@ -69,6 +69,7 @@ addon.L = {
     ["Erfasste Spielzeit: "] = "Recorded playtime: ",
     ["Erfasste Spielzeit: 0d 0h 0m"] = "Recorded playtime: 0d 0h 0m",
     ["Erholt %"] = "Rested %",
+    ["Erholt-EP in Prozent eines Levels.\n~ = Offline-Schätzung mit Basisraten, ohne Sonderboni.\n— = Keine gültigen EP-Daten oder Höchststufe. Betroffene Charaktere einmal einloggen."] = "Rested XP as a percentage of one level.\n~ = Offline estimate using base rates, without special bonuses.\n— = No valid XP data or maximum level. Log in once on affected characters.",
     ["Filter zurücksetzen"] = "Reset filters",
     ["ForeverBuddy · Charaktere"] = "ForeverBuddy · Characters",
     ["Fraktion"] = "Faction",

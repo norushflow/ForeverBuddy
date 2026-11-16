@@ -58,7 +58,8 @@ function Buddy.Toggle()
         local sub = style.Text(panel,"small",style.Color.muted)
         sub:SetPoint("TOPLEFT",style.Spacing.panel,-49); sub:SetText(L["Dein Begleiter in Forever"])
         local close = style.Close(CreateFrame("Button",nil,panel,"UIPanelCloseButton"))
-        close:SetPoint("TOPRIGHT",-3,-3)
+        close:ClearAllPoints()
+        close:SetPoint("TOPRIGHT",panel,"TOPRIGHT",-4,1)
         for index,module in ipairs(Buddy.modules) do
             local entry = module
             local check = CreateFrame("CheckButton",nil,panel,"UICheckButtonTemplate")

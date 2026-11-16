@@ -167,38 +167,69 @@ if count == 0 then return nil end
 return math.floor(total / count + 0.5)
 end
 
-local function GetRestedXPNow()
-if not GetXPExhaustion then return 0 end
-return SafeNum(GetXPExhaustion())
-end
-
 local function RestXPPercent(rested, maxXP)
 if maxXP <= 0 or rested <= 0 then return 0 end
 return Round1((rested / maxXP) * 100)
 end
 
-local function EstimateRestedXPPercent(char)
+local restedReady = false
+local function UpdateRestedXP(c)
+local maxLevel = GetMaxPlayerLevel and SafeNum(GetMaxPlayerLevel()) or 0
+local xpmax = UnitXPMax("player")
+if not Public(xpmax) or type(xpmax) ~= "number" or xpmax < 0 then return end
+if maxLevel > 0 and SafeNum(c.level) >= maxLevel then
+ c.xpmax, c.rested_xp, c.restxp_pct = 0, 0, 0
+else
+ -- During login/logout the client may briefly return zero for a leveling character.
+ -- Never replace a complete snapshot with unavailable XP data.
+ if xpmax <= 0 or not GetXPExhaustion then return end
+ local rested = GetXPExhaustion()
+ if not Public(rested) or (rested ~= nil and (type(rested) ~= "number" or rested < 0)) then return end
+ c.xpmax, c.rested_xp = xpmax, rested or 0 -- nil is valid: no rested XP left.
+ c.restxp_pct = RestXPPercent(c.rested_xp, xpmax)
+end
+c.rested_ts, c.rested_level, c.rested_logout = time(), c.level, nil
+c.rested_inn = nil
+if IsResting then
+ local resting = IsResting()
+ if Public(resting) then c.rested_inn = not not resting end
+end
+restedReady = true
+end
+
+local function GetRestedXPPercent(char, now)
 local xpmax = SafeNum(char.xpmax)
-if xpmax <= 0 then return 0 end
+if xpmax <= 0 or char.rested_xp == nil then return nil end
+if char.rested_level and char.rested_level ~= char.level then return nil end
 
-local rested = SafeNum(char.rested_xp)
-local ts = SafeNum(char.rested_ts)
-rested = math.max(0, rested)
-if ts <= 0 then return Round1((rested / xpmax) * 100) end
+local rested = math.max(0, SafeNum(char.rested_xp))
+if char == AltMiniDB.chars[CURRENT_KEY] then return RestXPPercent(rested, xpmax) end
+local ts = math.max(SafeNum(char.rested_ts), SafeNum(char.rested_logout))
+-- Old snapshots have no logout location: keep their known value until the next login.
+if ts <= 0 or char.rested_inn == nil then return RestXPPercent(rested, xpmax) end
 
-local elapsed = math.max(0, time() - ts)
-local days = elapsed / 86400
-local grown = days * 0.15 * xpmax
+local elapsed = math.max(0, now - ts)
+local rate = char.rested_inn and 0.15 or 0.0375
+local grown = elapsed / 86400 * rate * xpmax
 
-local cap = 1.5 * xpmax
+-- Base-rate estimate; special bonuses are not modeled. Never reduce an observed
+-- value above the normal cap (e.g. a Forever Legacy bonus).
+local cap = math.max(1.5 * xpmax, rested)
 local est = math.min(cap, rested + grown)
 
-return Round1((est / xpmax) * 100)
+return RestXPPercent(est, xpmax)
 end
 
 -- ---------------- Update char snapshot ----------------
 local function UpdateCharCore(skillChanged, loggingOut)
 local c = EnsureDBForCurrent()
+if loggingOut then
+ -- XP and rest APIs may already be cleared during PLAYER_LOGOUT. Keep the last
+ -- live snapshot and only mark when offline accrual can start.
+ if restedReady then c.rested_logout = time() end
+ c.updated = time()
+ return
+end
 
 local name, realm = UnitFullName("player")
 if not name then name = UnitName("player") or "?" end
@@ -211,17 +242,14 @@ local race = UnitRace("player")
 if race and not (issecretvalue and issecretvalue(race)) and race ~= "" then c.race = race end
 c.faction = UnitFactionGroup("player") or "?"
 
-if not loggingOut then UpdateProfessions(c, skillChanged) end
+UpdateProfessions(c, skillChanged)
 
-c.level   = SafeNum(UnitLevel("player"))
+local level = SafeNum(UnitLevel("player"))
+if level > 0 then c.level = level end
 local itemLevel = GetItemLevel()
 if itemLevel then c.ilvl = itemLevel end
 
-c.xpmax = SafeNum(UnitXPMax("player"))
-c.rested_xp = GetRestedXPNow()
-c.rested_ts = time()
-
-c.restxp_pct = RestXPPercent(c.rested_xp, c.xpmax)
+UpdateRestedXP(c)
 c.updated = time()
 end
 
@@ -298,7 +326,7 @@ local ui
 local COLS = {
 { key="name",         title=L["Vor- und Nachname"], w=210 },
 { key="class",        title=L["Klasse"],    w=100 },
-{ key="race",         title=L["Rasse"],     w=100 },
+{ key="race",         title=L["Rasse"],     w=125 },
 { key="faction",      title=L["Fraktion"],  w=90  },
 { key="prof1",        title=L["Beruf 1"],   w=150 },
 { key="prof2",        title=L["Beruf 2"],   w=150 },
@@ -316,7 +344,8 @@ return c[key]
 end
 
 local function BuildSortedList()
-    local characters, sortValues = {}, {}
+    local characters, sortValues, restedValues = {}, {}, {}
+    local now = time()
     local filters = EnsureFilters()
     local sort = GetSortState()
     local sortKey, ascending = sort.key, sort.asc
@@ -324,7 +353,9 @@ local function BuildSortedList()
 
     for _, character in pairs(AltMiniDB.chars) do
         if character and character.name and character.realm and MatchesFilters(character, filters) then
+            restedValues[character] = GetRestedXPPercent(character, now)
             local value = GetCellValueForSort(character, sortKey)
+            if sortKey == "restxp_pct" then value = restedValues[character] or -1 end
             sortValues[character] = numeric and SafeNum(value) or tostring(SafeStr(value))
             characters[#characters+1] = character
         end
@@ -341,7 +372,7 @@ local function BuildSortedList()
         return av > bv
     end)
 
-    return characters
+    return characters, restedValues
 end
 
 local CLASS_TEX = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
@@ -427,14 +458,15 @@ ui.title = MakeFS(ui, "title")
 ui.title:SetPoint("TOPLEFT", 20, -25)
 ui.title:SetText(L["ForeverBuddy · Charaktere"])
 
--- Account Playtime (top-right)
-ui.accountPlaytime = MakeFS(ui, "body", Color.muted)
-ui.accountPlaytime:SetPoint("TOPRIGHT", -58, -22)
+-- Shared header for the overview and class statistics.
+ui.accountPlaytime = MakeFS(ui, 18, Color.gold)
+ui.accountPlaytime:SetPoint("RIGHT", ui, "TOPRIGHT", -24, -42)
 ui.accountPlaytime:SetJustifyH("RIGHT")
 ui.accountPlaytime:SetText(L["Erfasste Spielzeit: 0d 0h 0m"])
 
 local close = Style.Close(CreateFrame("Button", nil, ui, "UIPanelCloseButton"))
-close:SetPoint("TOPRIGHT", -4, -4)
+close:ClearAllPoints()
+close:SetPoint("TOPRIGHT", ui, "TOPRIGHT", -4, 1)
 
 local refresh = Style.Button(CreateFrame("Button", nil, ui, "UIPanelButtonTemplate"))
 refresh:SetSize(110, 24)
@@ -559,6 +591,17 @@ if CURRENT_TAB ~= 1 then return end
 ToggleSort(btn.colKey)
 if ui and ui.Render then ui.Render() end
 end)
+if col.key == "restxp_pct" then
+ btn:SetScript("OnEnter", function(self)
+  local tooltip = Style.Tooltip(self, "ANCHOR_RIGHT")
+  if not tooltip then return end
+  tooltip:SetText(L["Erholt %"])
+  tooltip:AddLine(L["Erholt-EP in Prozent eines Levels.\n~ = Offline-Schätzung mit Basisraten, ohne Sonderboni.\n— = Keine gültigen EP-Daten oder Höchststufe. Betroffene Charaktere einmal einloggen."], 1, 1, 1, true)
+  Style.ShowTooltip()
+ end)
+ btn:SetScript("OnLeave", Style.HideTooltip)
+ btn:SetScript("OnHide", Style.HideTooltip)
+end
 
 ui.headers[i] = btn
 hx = hx + col.w + 8
@@ -703,7 +746,7 @@ ui.filterLabel:SetText("")
 ui.filterLabel:Hide()
 end
 
-local data = BuildSortedList()
+local data, restedValues = BuildSortedList()
 local total = #data
 local rowsVisible = math.max(5, math.min(LIST_ROWS, total))
 ui:SetHeight(LIST_TOP + rowsVisible * ROW_H + 44)
@@ -742,11 +785,11 @@ v = FormatProf(p1_name, p1_lvl)
 elseif key == "prof2" then
 v = FormatProf(p2_name, p2_lvl)
 elseif key == "restxp_pct" then
-if c == currentCharTable then
-v = string.format("%.1f%%", SafeNum(c.restxp_pct))
+local percent = restedValues[c]
+if percent == nil then
+v = "—"
 else
-local est = EstimateRestedXPPercent(c)
-v = "~" .. string.format("%.1f%%", SafeNum(est))
+v = (c == currentCharTable and "" or "~") .. string.format("%.1f%%", percent)
 end
 elseif key == "playtime_sec" then
 v = SecToDH(c.playtime_sec)
@@ -856,12 +899,14 @@ SlashCmdList["FOREVERBUDDYCHARS"] = ToggleUI
 -- ---------------- Events ----------------
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_LOGIN")
+ev:RegisterEvent("PLAYER_ENTERING_WORLD")
 ev:RegisterEvent("PLAYER_LEVEL_UP")
 ev:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 ev:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 ev:RegisterEvent("SKILL_LINES_CHANGED")
 ev:RegisterEvent("TIME_PLAYED_MSG")
 ev:RegisterEvent("UPDATE_EXHAUSTION")
+ev:RegisterEvent("PLAYER_UPDATE_RESTING")
 ev:RegisterEvent("PLAYER_XP_UPDATE")
 ev:RegisterEvent("PLAYER_LOGOUT")
 local updateQueued=false
@@ -870,6 +915,7 @@ local skillsChanged=false
 ev:SetScript("OnEvent", function(_, event, a1)
 if event == "PLAYER_LOGIN" then
 CURRENT_KEY = BuildCurrentKey()
+restedReady = false
 UpdateCharCore()
 
 RequestPlaytime()

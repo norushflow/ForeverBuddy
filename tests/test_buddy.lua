@@ -192,33 +192,127 @@ skills();assert(c.prof2_name=='—','unlearning left a stale profession')
 C_Timer.After=oldAfter
 print('PASS: saved professions survive missing/partial data and logout; learning/unlearning updates')
 
--- Audit 1.0: Offline-Erholung beginnt auch bei null; gespeicherte Daten bleiben gleich.
-local originalTime=time
-function time() return 100000 end
-Buddy.db.characters.filters={class='HUNTER'}
-local offline={name='Offline',realm='Realm',class='HUNTER',level=20,xpmax=1000,
- rested_xp=0,rested_ts=time()-86400}
-Buddy.db.characters.chars['Realm-Offline']=offline
-SlashCmdList.FOREVERBUDDYCHARS()
-local characters=ForeverbuddyCharactersFrame
-if not characters:IsShown() then SlashCmdList.FOREVERBUDDYCHARS() end
-characters.Render()
-local found=false
-for _,row in ipairs(characters.rows) do
- if row:IsShown() and row.cells[1].text=='Offline Realm' then
-  assert(row.cells[9].text=='~15.0%','one day must add estimated rest from zero')
-  found=true
- end
+-- Rested XP regression: logout API teardown used to erase every offline snapshot.
+local originalTime, originalName, originalLevel = time, UnitFullName, UnitLevel
+local originalXP, originalRest, originalResting, originalMaxLevel = UnitXPMax, GetXPExhaustion, IsResting, GetMaxPlayerLevel
+local originalSecret, originalAfter = issecretvalue, C_Timer.After
+local oldChars, oldFilters, oldSort = Buddy.db.characters.chars, Buddy.db.characters.filters, Buddy.db.characters.sort
+Buddy.db.characters.chars={}
+Buddy.db.characters.filters={}
+Buddy.db.characters.sort={key='name',asc=true}
+local now, playerName, playerLevel, xpmax, rested, inInn = 10000000, 'Buddy', 20, 1000, 200, true
+local reads, queue, secret = 0, {}, {}
+time=function() return now end
+UnitFullName=function() return playerName,'Realm' end
+UnitLevel=function() return playerLevel end
+UnitXPMax=function() reads=reads+1;return xpmax end
+GetXPExhaustion=function() reads=reads+1;return rested end
+IsResting=function() return inInn end
+GetMaxPlayerLevel=function() return 60 end
+issecretvalue=function(value) return value==secret end
+C_Timer.After=function(_,fn) queue[#queue+1]=fn end
+local function fire(event,unit)
+ charEvents.scripts.OnEvent(charEvents,event,unit)
+ while #queue>0 do table.remove(queue,1)() end
 end
-assert(found and offline.rested_xp==0,'estimate must not overwrite snapshot')
-time=originalTime
+local function restedText(name)
+ characters.Render()
+ for _,row in ipairs(characters.rows) do
+  if row:IsShown() and row.cells[1].text==name..' Realm' then return row.cells[9].text end
+ end
+ error('missing character row: '..name)
+end
+fire('PLAYER_LOGIN')
+local first=Buddy.db.characters.chars['Realm-Buddy']
+assert(first.xpmax==1000 and first.rested_xp==200 and first.rested_inn==true)
+assert(restedText('Buddy')=='20.0%','current character uses live XP')
+local sampleTime=first.rested_ts
+now=now+8*3600
+xpmax,rested,playerLevel,inInn=0,nil,0,false
+reads=0
+fire('PLAYER_LOGOUT')
+assert(reads==0,'logout must not query cleared XP APIs')
+assert(first.xpmax==1000 and first.rested_xp==200 and first.restxp_pct==20 and first.level==20,
+ 'logout erased the last valid XP snapshot')
+assert(first.rested_ts==sampleTime and first.rested_logout==now and first.rested_inn==true,
+ 'logout must retain snapshot and location, with a separate offline start')
+playerName,playerLevel,xpmax,rested='Second',20,1000,0
+fire('PLAYER_LOGIN')
+assert(restedText('Buddy')=='~20.0%','online time must not be counted as offline rest')
+now=now+86400
+assert(restedText('Buddy')=='~35.0%','one offline day in an inn adds 15 percentage points')
+assert(restedText('Second')=='0.0%','current character must never receive estimated offline XP')
+assert(first.rested_xp==200 and first.rested_ts==sampleTime,'render must not compound or overwrite snapshots')
+-- Early login data and secret values preserve the snapshot; entering world retries it.
+playerName,xpmax='Buddy',0
+fire('PLAYER_LOGIN')
+assert(first.rested_xp==200 and first.rested_ts==sampleTime and first.rested_logout~=nil,
+ 'incomplete login overwrote the offline snapshot')
+fire('PLAYER_LOGOUT')
+assert(first.rested_logout==sampleTime+8*3600,'failed login must not reset offline accrual')
+xpmax,rested,inInn=1000,350,true
+fire('PLAYER_ENTERING_WORLD')
+assert(first.rested_xp==350 and first.rested_ts==now and first.rested_logout==nil)
+local goodTime=now
+now=now+60
+xpmax=secret
+fire('PLAYER_XP_UPDATE','player')
+assert(first.rested_xp==350 and first.rested_ts==goodTime)
+xpmax,rested=1000,secret
+fire('UPDATE_EXHAUSTION')
+assert(first.rested_xp==350 and first.rested_ts==goodTime)
+rested=nil
+fire('UPDATE_EXHAUSTION')
+assert(first.rested_xp==0 and restedText('Buddy')=='0.0%','nil exhaustion with valid XP is genuinely zero')
+inInn=false
+fire('PLAYER_UPDATE_RESTING')
+assert(first.rested_inn==false,'leaving an inn must update the saved rest rate')
+fire('PLAYER_LOGOUT')
+playerName,rested='Second',0
+fire('PLAYER_LOGIN')
+now=now+86400
+assert(restedText('Buddy')=='~3.8%','one day outside an inn uses the quarter rate')
+-- Unknown/corrupt snapshots, caps, clock skew and sorting use the same displayed value.
+local function alt(name,amount,inn,age)
+ local value={name=name,realm='Realm',class='HUNTER',level=20,xpmax=1000,
+  rested_xp=amount,rested_ts=now-(age or 86400),rested_inn=inn,restxp_pct=0}
+ Buddy.db.characters.chars['Realm-'..name]=value
+ return value
+end
+Buddy.db.characters.chars={['Realm-Second']=Buddy.db.characters.chars['Realm-Second']}
+local zero=alt('Zero',0,true)
+assert(restedText('Zero')=='~15.0%','offline accrual must start even at zero rested XP')
+local missing=alt('Missing',0,true);missing.xpmax=0
+assert(restedText('Missing')=='—','missing XP is unknown, not a false zero')
+local unknown=alt('Unknown',250,nil)
+assert(restedText('Unknown')=='~25.0%','old snapshots without a rest location must not invent accrual')
+local future=alt('Future',100,true,-86400)
+assert(restedText('Future')=='~10.0%','clock skew cannot subtract rested XP')
+local cap=alt('Cap',0,true,20*86400)
+assert(restedText('Cap')=='~150.0%','base estimate stops at the normal cap')
+local bonus=alt('Bonus',1800,true)
+assert(restedText('Bonus')=='~180.0%','observed bonuses above the base cap must survive')
+Buddy.db.characters.sort={key='restxp_pct',asc=false}
+characters.Render()
+assert(characters.rows[1].cells[1].text=='Bonus Realm' and characters.rows[2].cells[1].text=='Cap Realm',
+ 'rested sorting must use estimates, not stale stored percentages')
+assert(zero.rested_xp==0 and cap.rested_xp==0,'repeated rendering changed saved values')
+playerLevel,xpmax=60,0
+fire('PLAYER_XP_UPDATE','player')
+assert(restedText('Second')=='—','level-capped characters must not gain fictitious rest')
+Buddy.db.characters.chars, Buddy.db.characters.filters, Buddy.db.characters.sort=oldChars,oldFilters,oldSort
+time,UnitFullName,UnitLevel=originalTime,originalName,originalLevel
+UnitXPMax,GetXPExhaustion,IsResting,GetMaxPlayerLevel=originalXP,originalRest,originalResting,originalMaxLevel
+issecretvalue,C_Timer.After=originalSecret,originalAfter
+fire('PLAYER_LOGIN')
+print('PASS: rested XP survives logout/login, tracks rest location, estimates offline time and sorts correctly')
 -- Zentrale Tooltip-Hilfe überspringt nicht zugängliche Blizzard-Frames.
 local oldHide=GameTooltip.Hide
 GameTooltip.IsForbidden=function() return true end
 GameTooltip.Hide=function() error('forbidden tooltip touched') end
 assert(pcall(Buddy.HideTooltip))
 GameTooltip.IsForbidden=function() return false end;GameTooltip.Hide=oldHide
-print('PASS: zero-rested offline estimate and shared tooltip guard')
+print('PASS: shared tooltip guard')
 
 -- Menu items close the hub; the inline action bar controls stay accessible.
 for _,module in ipairs(Buddy.modules) do
