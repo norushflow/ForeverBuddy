@@ -150,9 +150,15 @@ function Buddy.CreateMinimap()
         button:SetPoint("CENTER",Minimap,"CENTER",math.cos(angle)*(width/2+8),math.sin(angle)*(height/2+8))
         end)
     end
-    button:RegisterForClicks("LeftButtonUp","RightButtonUp")
+    button:RegisterForClicks("LeftButtonUp","RightButtonUp","MiddleButtonUp")
     button:SetScript("OnClick",function(_,mouse)
-        if mouse=="RightButton" then Buddy.OpenModule(Buddy.modules[1]) else Buddy.Toggle() end
+        if mouse=="RightButton" then
+            Buddy.OpenModule(Buddy.modules[1])
+        elseif mouse=="MiddleButton" then
+            Buddy.Meters.Toggle()
+        elseif mouse=="LeftButton" then
+            Buddy.Toggle()
+        end
     end)
     button:RegisterForDrag("LeftButton")
     button:SetScript("OnDragStart",function(self)
@@ -176,6 +182,7 @@ function Buddy.CreateMinimap()
         tooltip:AddLine("ForeverBuddy",unpack(color.gold,1,3))
         tooltip:AddLine(L["Linksklick: Zentrale"],unpack(color.text,1,3))
         tooltip:AddLine(L["Rechtsklick: Charaktere"],unpack(color.text,1,3))
+        tooltip:AddLine(L["Mittelklick: Schaden und Heilung umschalten"],unpack(color.text,1,3))
         tooltip:AddLine(L["Ziehen: Position ändern"],unpack(color.muted,1,3))
         style.ShowTooltip()
     end)

@@ -13,6 +13,14 @@ local function widgetNumber(v)
     if public(v) and type(v)~="number" then return 0 end
     return v
 end
+local function setMeterValue(text,value,compactFormat,fullFormat)
+    value=widgetNumber(value)
+    if public(value) and type(AbbreviateLargeNumbers)=="function" then
+        text:SetFormattedText(compactFormat,AbbreviateLargeNumbers(value))
+    else
+        text:SetFormattedText(fullFormat,value)
+    end
+end
 local function report(message) if Buddy.Message then Buddy.Message(message) end end
 local function nativeEnabled()
     if not C_CVar or type(C_CVar.GetCVarBool)~="function" then return nil end
@@ -50,8 +58,8 @@ function M.Paint(window,session)
             row.rank:SetText(index..".")
             -- Namen dürfen secret sein; keine Namensvergleiche, Verkettung oder Sortierung.
             row.name:SetText(source.name)
-            row.amount:SetFormattedText("%.0f",widgetNumber(source.totalAmount))
-            row.rate:SetFormattedText("%.0f/s",widgetNumber(source.amountPerSecond))
+            setMeterValue(row.amount,source.totalAmount,"%s","%.0f")
+            setMeterValue(row.rate,source.amountPerSecond,"%s/s","%.0f/s")
             local class=source.classFilename
             local color
             if public(class) and type(class)=="string" and RAID_CLASS_COLORS then color=RAID_CLASS_COLORS[class] end
@@ -116,8 +124,9 @@ function M.Create()
             row.rank=Style.Text(row,"hud",Color.gold);row.rank:SetPoint("LEFT",3,0);row.rank:SetWidth(20)
             row.name=Style.Text(row,"body");row.name:SetPoint("LEFT",24,0);row.name:SetWidth(112)
             row.name:SetJustifyH("LEFT");row.name:SetWordWrap(false)
-            row.amount=Style.Text(row,"body");row.amount:SetPoint("TOPRIGHT",-4,-2);row.amount:SetWidth(100);row.amount:SetJustifyH("RIGHT")
-            row.rate=Style.Text(row,"small",Color.muted);row.rate:SetPoint("BOTTOMRIGHT",-4,3);row.rate:SetWidth(100);row.rate:SetJustifyH("RIGHT")
+            row.amount=Style.Text(row,"heading",Color.gold)
+            row.amount:SetPoint("TOPRIGHT",-6,-1);row.amount:SetWidth(100);row.amount:SetJustifyH("RIGHT")
+            row.rate=Style.Text(row,"small",Color.muted);row.rate:SetPoint("BOTTOMRIGHT",-6,2);row.rate:SetWidth(100);row.rate:SetJustifyH("RIGHT")
             row:Hide();w.rows[i]=row
         end
         w:EnableMouseWheel(true)
@@ -163,7 +172,19 @@ function M.Toggle()
     report(target and L["Schaden und Heilung eingeschaltet: unten rechts. Mausrad: weitere Spieler."]
         or L["Schaden und Heilung ausgeschaltet."])
 end
+local function anchorTooltipAboveMeters(tooltip)
+    local window=M.windows[2]
+    if tooltip~=GameTooltip or not window or not window:IsVisible() then return end
+    Buddy.Foreign(tooltip, function(frame)
+        if frame:GetAnchorType()~="ANCHOR_NONE" then return end
+        frame:ClearAllPoints()
+        frame:SetPoint("BOTTOMRIGHT",window,"TOPRIGHT",0,8)
+    end)
+end
 function Buddy.LoadMeters()
+    if type(hooksecurefunc)=="function" and type(GameTooltip_SetDefaultAnchor)=="function" then
+        hooksecurefunc("GameTooltip_SetDefaultAnchor",anchorTooltipAboveMeters)
+    end
     M.db=Buddy.db.meters;M.db.arrange=nil
     M.db.active=M.db.active==true
     M.db.overall=M.db.overall==true

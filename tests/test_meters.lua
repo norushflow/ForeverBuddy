@@ -13,11 +13,13 @@ local function drain() local n=0;while #queue>0 do local fn=table.remove(queue,1
 local methods={}
 function methods:SetScript(k,v) assert(k~='OnUpdate');self.scripts[k]=v end
 function methods:RegisterEvent(k) self.events[k]=true end
+function methods:RegisterForClicks(...) self.clicks={...} end
 function methods:SetText(v) self.text=v end
 function methods:SetFormattedText(fmt,v) self.format=fmt;self.value=v end
 function methods:Hide() self.shown=false end
 function methods:Show() self.shown=true end
 function methods:IsShown() return self.shown end
+methods.IsVisible=methods.IsShown
 function methods:SetPoint(...) self.point={...} end
 function methods:SetMinMaxValues(a,b) self.minimum=a;self.maximum=b end
 function methods:SetValue(v) self.value=v end
@@ -26,9 +28,13 @@ function methods:CreateTexture() return object() end
 function methods:CreateFontString() return object() end
 object=function() return setmetatable({scripts={},events={},shown=true}, {__index=function(_,k)return methods[k] or function() end end}) end
 local created=0
+local minimapButton
 function CreateFrame(kind,name,parent,template)
  assert(not template or template=='UIPanelButtonTemplate' or template=='BackdropTemplate','no native meter templates')
- created=created+1;return object()
+ created=created+1
+ local frame=object()
+ if name=='ForeverbuddyMinimapButton' then minimapButton=frame end
+ return frame
 end
 UIParent=object();SlashCmdList={};RAID_CLASS_COLORS={WARRIOR={r=1,g=.5,b=.2}}
 local nativeAccess=0
@@ -57,6 +63,21 @@ C_DamageMeter={GetCombatSessionFromType=function(segment,kind)
  return session
 end}
 assert(loadfile('Style.lua'))('Foreverbuddy',B)
+GameTooltip=object()
+local forbiddenTooltip,anchorType=false,'ANCHOR_NONE'
+function GameTooltip:IsForbidden() return forbiddenTooltip end
+function GameTooltip:GetAnchorType() return anchorType end
+local defaultAnchorHook
+function hooksecurefunc(name,callback)
+    assert(name=='GameTooltip_SetDefaultAnchor')
+    defaultAnchorHook=callback
+end
+function GameTooltip_SetDefaultAnchor(tooltip)
+    tooltip:SetPoint('BOTTOMRIGHT',UIParent,'BOTTOMRIGHT',-10,10)
+    defaultAnchorHook(tooltip)
+end
+assert(loadfile('Core.lua'))('Foreverbuddy',B)
+B.Message=function() messages=messages+1 end
 assert(loadfile('Modules/Meters.lua'))('Foreverbuddy',B);B.LoadMeters();local M=B.Meters
 M.events.scripts.OnEvent(nil,'PLAYER_ENTERING_WORLD');drain()
 assert(reads==0 and writes==0 and #M.windows==0,'disabled module creates no windows/queries')
@@ -69,6 +90,20 @@ assert(#M.windows[1].rows==5 and #M.windows[2].rows==5,'five visible rows per wi
 local row=M.windows[1].rows[1]
 assert(rawequal(row.maximum,secret) and rawequal(row.value,secret),'secret bar values passed through')
 assert(rawequal(row.name.text,secret) and rawequal(row.amount.value,secret) and rawequal(row.rate.value,secret),'secret text passed directly to widgets')
+local largeRow=M.windows[1].rows[2]
+assert(largeRow.amount.format=='%.0f' and largeRow.amount.value==200,'full value when formatter is unavailable')
+sources[2].totalAmount=12500
+sources[2].amountPerSecond=2100
+function AbbreviateLargeNumbers(value)
+    assert(not issecretvalue(value),'only public numbers may be abbreviated')
+    return ('%.1fk'):format(value/1000)
+end
+M.Refresh()
+assert(largeRow.amount.format=='%s' and largeRow.amount.value=='12.5k')
+assert(largeRow.rate.format=='%s/s' and largeRow.rate.value=='2.1k')
+assert(rawequal(row.amount.value,secret) and rawequal(row.rate.value,secret))
+AbbreviateLargeNumbers=nil
+
 local before=reads
 for i=1,100 do M.events.scripts.OnEvent(nil,'DAMAGE_METER_COMBAT_SESSION_UPDATED',secret) end
 assert(#queue==1,'bursts coalesced');drain();assert(reads==before+2)
@@ -103,5 +138,42 @@ M.events.scripts.OnEvent(nil,'PLAYER_ENTERING_WORLD');drain()
 assert(messages==beforeMessages and M.db.active==false and not M.windows[1]:IsShown(),'startup override stays silent')
 enabled=false;M.db.active=true;M.events.scripts.OnEvent(nil,'PLAYER_ENTERING_WORLD');drain()
 assert(M.windows[1]:IsShown(),'saved active state restored without startup writes')
+-- Exercise the real minimap click handler with the existing meter integration.
+B.db.minimap={angle=220}
+B.CreateMinimap()
+assert(table.concat(minimapButton.clicks,',')=='LeftButtonUp,RightButtonUp,MiddleButtonUp')
+local leftClicks,rightClicks=0,0
+B.Toggle=function() leftClicks=leftClicks+1 end
+B.OpenModule=function(module)
+    assert(module==B.modules[1])
+    rightClicks=rightClicks+1
+end
+local click=minimapButton.scripts.OnClick
+click(minimapButton,'LeftButton')
+click(minimapButton,'RightButton')
+assert(M.db.active and leftClicks==1 and rightClicks==1)
+click(minimapButton,'MiddleButton')
+assert(not M.db.active and not M.windows[1]:IsShown() and not M.windows[2]:IsShown())
+click(minimapButton,'MiddleButton')
+drain()
+assert(M.db.active and M.windows[1]:IsShown() and M.windows[2]:IsShown())
+assert(leftClicks==1 and rightClicks==1,'middle click only toggles the meters')
+GameTooltip_SetDefaultAnchor(GameTooltip)
+local point=GameTooltip.point
+assert(point[1]=='BOTTOMRIGHT' and point[2]==M.windows[2] and point[3]=='TOPRIGHT' and point[5]>0)
+local otherTooltip=object()
+GameTooltip_SetDefaultAnchor(otherTooltip)
+assert(otherTooltip.point[2]==UIParent,'other tooltips keep their original anchor')
+anchorType='ANCHOR_CURSOR'
+GameTooltip_SetDefaultAnchor(GameTooltip)
+assert(GameTooltip.point[2]==UIParent,'cursor anchoring is preserved')
+anchorType='ANCHOR_NONE'
+forbiddenTooltip=true
+GameTooltip_SetDefaultAnchor(GameTooltip)
+assert(GameTooltip.point[2]==UIParent,'forbidden tooltip is left alone')
+forbiddenTooltip=false
+click(minimapButton,'MiddleButton')
+GameTooltip_SetDefaultAnchor(GameTooltip)
+assert(GameTooltip.point[2]==UIParent,'standard anchor returns when the meters close')
 assert(nativeAccess==0,'native frames remain untouched')
 print('PASS: two custom meters, secret widget passthrough, scrolling, session switching, batching, hidden idle, native isolation and explicit CVar control')

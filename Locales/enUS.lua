@@ -123,6 +123,7 @@ addon.L = {
     ["Oberfläche neu laden"] = "Reload interface",
     ["One Button Setup"] = "One Button Setup",
     ["Rechtsklick: Charaktere"] = "Right-click: characters",
+    ["Mittelklick: Schaden und Heilung umschalten"] = "Middle-click: toggle damage and healing meters",
     ["Sammlungsdaten derzeit nicht verfügbar."] = "Collection data currently unavailable.",
     ["Schaden"] = "Damage",
     ["Schaden und Heilung"] = "Damage and healing",
