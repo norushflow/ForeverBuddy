@@ -6,6 +6,14 @@ Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, A
 
 **Client:** WoW Forever · **Interface:** 16001 · **Eigenständig:** keine zusätzlichen Addons erforderlich.
 
+[Wago](https://addons.wago.io/addons/foreverbuddy) · [CurseForge](https://www.curseforge.com/wow/addons/foreverbuddy-by-norushflow) · [GitHub Releases](https://github.com/norushflow/ForeverBuddy/releases)
+
+## Einblicke
+
+[![Charakterübersicht mit Fraktions- und Berufsfiltern](branding/screenshots/characters.webp)](branding/screenshots/characters.webp)
+
+[Berufspost neben dem WoW-Briefkasten](branding/screenshots/profession-mail.webp) · [Schadens- und Heilungsanzeige](branding/screenshots/meters.webp)
+
 ## Funktionen
 
 - Charakterübersicht mit Volk, Fraktionsfilter, angelegter Gegenstandsstufe und geschätzten Ruhe-EP anhand des letzten bekannten Ruheorts.
