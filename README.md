@@ -8,10 +8,10 @@ Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, A
 
 ## Funktionen
 
-- Charakterübersicht mit vollständigen Namen und den neun Forever-Klassen.
+- Charakterübersicht mit Volk, Fraktionsfilter, angelegter Gegenstandsstufe und geschätzten Ruhe-EP anhand des letzten bekannten Ruheorts.
 - Dungeon-Transmog und eigene Schadens-/Heilungsanzeige.
 - Automatische Sicherung je Charakter und Klasse sowie Vorlagen je Klasse und Rolle, jeweils mit nativer Klickzauberbelegung.
-- Berufspost mit neun Materialgruppen und getrennten Empfängern für Horde und Allianz.
+- Berufspost mit sieben Berufen und einem Bankcharakter und getrennten Empfängern für Horde und Allianz.
 
 ## Sprachen und aktueller Stand
 
@@ -37,9 +37,9 @@ Für WowUp die [Repository-Adresse](https://github.com/norushflow/ForeverBuddy) 
 
 Die automatische Sicherung bleibt unter `ForeverbuddyCharDB.actions` erhalten. Gemeinsame Rollenvorlagen liegen in `ForeverbuddyDB.bars.library`. Ältere Klassenvorlagen sind weiterhin über `/fbbars laden` erreichbar. Beim Laden einer Rollenvorlage bleiben allgemeine Makros erhalten. Fehlende Charaktermakros werden bei verfügbarer Client-API angelegt. Bei einem gleichnamigen Charaktermakro mit anderem Inhalt bleibt die aktuelle Belegung erhalten.
 
-**Berufspost:** Vor- und Nachnamen mit Leerzeichen als Empfänger eintragen. An der Mailbox dockt das Fenster rechts an; erst **Senden** startet den Versand. Weitere Briefe folgen nach Bestätigung, **Stoppen** verhindert weitere Briefe. Gemeinsame Materialien gehen an die zuerst gesendete Gruppe. Gebundene oder gesperrte Gegenstände werden übersprungen; vorhandene Anhänge, Geld oder Nachnahme blockieren den Start. Nach Fehlern verbliebene Anhänge im normalen Briefentwurf prüfen.
+**Berufspost:** Vor- und Nachnamen mit Leerzeichen als Empfänger eintragen. An der Mailbox dockt das Fenster rechts an; erst **Senden** startet den Versand. Weitere Briefe folgen nach Bestätigung, **Stoppen** verhindert weitere Briefe. Materialien für mehrere Berufe werden übersprungen. Vor dem Versand wird jeder Anhang geprüft. Gebundene oder gesperrte Gegenstände werden übersprungen; vorhandene Anhänge, Geld oder Nachnahme blockieren den Start. Nach Fehlern verbliebene Anhänge im normalen Briefentwurf prüfen.
 
-Die Materialgruppen richten sich nach Handelswaren-Unterklassen, nicht nach vollständigen Rezepten. Mehrdeutige Zutaten werden nicht automatisch zugeordnet.
+Die Berufspost erkennt unterstützte Materialien anhand ihrer Gegenstands-ID.
 
 ## Änderungen und Entwicklung
 
