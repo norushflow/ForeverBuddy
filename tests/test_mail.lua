@@ -8,23 +8,23 @@ local found={}
 for _,g in ipairs(M.groups) do found[g[1]]=true end
 assert(not found.inscription and not found.jewelcrafting and not found.mining and not found.herbalism)
 local counts = {0, 0, 0, 0, 0, 0, 0}
-local bankOnly = 0
+local sharedCount = 0
 for id, mask in pairs(B.MailMaterials) do
     local matches = 0
     for i = 1, 7 do
         local group = M.groups[i]
-        assert(M.Matches(group, id) == (group[3] == mask))
+        assert(M.Matches(group, id) == (bit.band(mask, group[3]) ~= 0))
         if M.Matches(group, id) then
             counts[i] = counts[i] + 1
             matches = matches + 1
         end
         assert(not M.Matches(group, 999999999) and not M.Matches(group, nil))
     end
-    assert(M.Matches(M.groups[8], id) and matches <= 1)
-    if matches == 0 then bankOnly = bankOnly + 1 end
+    assert(M.Matches(M.groups[8], id) and matches > 0)
+    if matches > 1 then sharedCount = sharedCount + 1 end
 end
 for _, count in ipairs(counts) do assert(count > 0) end
-assert(bankOnly > 0 and not M.Matches(M.groups[8], 999999999) and not M.Matches(M.groups[8], nil))
+assert(sharedCount > 0 and not M.Matches(M.groups[8], 999999999) and not M.Matches(M.groups[8], nil))
 
 local function stack(itemID, count)
     return {itemID = itemID, stackCount = count or 1}
@@ -98,24 +98,40 @@ faction = 'Horde'
 
 -- Every recipient gets only its own allowlisted materials, including with a mixed bag.
 local samples = {765, 3470, 4359, 2934, 2589, 10940, 723}
-local blocked = {2770, 2840, 12809, 2320, 8153}
+local shared = {2841, 3575, 12809, 2320, 8153}
+local sharedByProfession = {
+    {3575, 8153}, {2841, 3575, 12809, 2320, 8153}, {2841, 3575, 8153},
+    {12809, 2320, 8153}, {12809, 2320, 8153}, {12809, 8153}, {},
+}
 for i, group in ipairs(M.groups) do
     B.db.mail.recipientsByFaction.Horde[group[1]] = group[1] .. ' Alt'
     reset()
-    local bag = {size = #samples + #blocked + 1, [1] = stack(999999999)}
+    local bag = {size = #samples + #shared + 1, [1] = stack(999999999)}
     for slot, id in ipairs(samples) do bag[slot + 1] = stack(id, slot) end
-    for slot, id in ipairs(blocked) do bag[#samples + slot + 1] = stack(id) end
+    for slot, id in ipairs(shared) do bag[#samples + slot + 1] = stack(id) end
     bags[0] = bag
     M.Start(group)
     assert(#sent == 1 and sent[1].recipient == group[1] .. ' Alt')
     if i <= #samples then
         assertDraft(1, samples[i], i)
-        assert(not draft[2])
+        for slot, id in ipairs(sharedByProfession[i]) do assertDraft(slot + 1, id) end
+        assert(#draft == 1 + #sharedByProfession[i])
     else
         for slot, id in ipairs(samples) do assertDraft(slot, id, slot) end
-        for slot = 1, #blocked do assertDraft(#samples + slot, blocked[slot]) end
+        for slot = 1, #shared do assertDraft(#samples + slot, shared[slot]) end
         assert(#draft == 12 and bags[0][1].itemID == 999999999)
     end
+end
+
+-- The same copper and stone stacks can be sent to either relevant profession.
+for _, group in ipairs({M.groups[2], M.groups[3]}) do
+    reset()
+    bags[0] = {size = 3, stack(2770, 3), stack(2835, 8), stack(2840, 5)}
+    M.Start(group)
+    assert(#sent == 1 and sent[1].recipient == group[1] .. ' Alt' and #draft == 3)
+    assertDraft(1, 2770, 3)
+    assertDraft(2, 2835, 8)
+    assertDraft(3, 2840, 5)
 end
 
 -- Separate stacks, holes, skipped slots and the actual attachment limit.
@@ -126,7 +142,7 @@ Enum = {BagIndex = {ReagentBag = 7}}
 bags[0] = {size = 7, [1] = stack(2934, 3), [3] = stack(2934, 19),
     [4] = {itemID = 2934, stackCount = 4, isBound = true},
     [5] = {itemID = 2934, stackCount = 5, isLocked = true},
-    [6] = stack(2770), [7] = stack(2318, 2)}
+    [6] = stack(2835), [7] = stack(2318, 2)}
 bags[7] = {size = 1, stack(8170, 8)}
 M.Start(M.groups[4])
 assert(#sent == 1 and events.OnUpdate)
@@ -195,7 +211,7 @@ events.OnUpdate(nil, 1)
 assert(#sent == 1 and not events.OnUpdate and bags[0][2].itemID == 2318)
 ATTACHMENTS_MAX_SEND, NUM_BAG_SLOTS = nil, nil
 event('MAIL_CLOSED')
-print('PASS: all mail recipients, exclusive routing, mixed bags, stack integrity, drafts and batching')
+print('PASS: all mail recipients, shared profession routing, mixed bags, stack integrity, drafts and batching')
 
 -- Exercise the actual positioning path with an existing panel.
 UIParent={}

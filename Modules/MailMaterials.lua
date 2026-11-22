@@ -1,11 +1,11 @@
 local _, Buddy = ...
 -- ForeverTome client archive 1.60.1.70707, generated 2026-10-31.
 -- https://forevertome.com/professions (client records: availability unverified; missing/encrypted records, no hotfixes).
--- Single-bit entries are eligible for profession mail. Multi-bit entries are bank-only.
+-- A material is eligible for each profession whose bit is set.
 -- Seven profession bits: alchemy 1, blacksmith 2, engineering 4, leatherworking 8, tailoring 16, enchanting 32, cooking 64.
 -- Categories below are client item subclasses. Only known trade goods and reagents; equipment, quests and consumables excluded.
 Buddy.MailMaterials = {
-    -- Cloth and bolts belong to tailoring; shared thread and silk reagents stay bank-only.
+    -- Cloth and bolts belong to tailoring; thread and silk reagents can also match other professions.
     [2320]=26, -- Coarse Thread
     [2321]=24, -- Fine Thread
     [2589]=16, -- Linen Cloth

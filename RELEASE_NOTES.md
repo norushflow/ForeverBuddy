@@ -1,5 +1,4 @@
-# v1.1.17
+# v1.1.18
 
-- Middle-click the minimap button to show or hide the damage and healing meters.
-- Make totals larger and gold, with smaller per-second values below. Abbreviate large numbers when the client permits formatting.
-- Move standard game tooltips above the meters while they are visible.
+- Allow profession mail to send shared materials to any profession that uses them. Choose the recipient by using that profession's Send button.
+- Include shared materials such as Copper Ore, Copper Bars, and Rough Stone for both Blacksmithing and Engineering.

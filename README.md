@@ -1,4 +1,4 @@
-# ForeverBuddy 1.1.17
+# ForeverBuddy 1.1.18
 
 <p align="center"><img src="branding/icon-400.png" alt="ForeverBuddy" width="160" height="160"></p>
 
@@ -45,7 +45,7 @@ Für WowUp die [Repository-Adresse](https://github.com/norushflow/ForeverBuddy) 
 
 Die automatische Sicherung bleibt unter `ForeverbuddyCharDB.actions` erhalten. Gemeinsame Rollenvorlagen liegen in `ForeverbuddyDB.bars.library`. Ältere Klassenvorlagen sind weiterhin über `/fbbars laden` erreichbar. Beim Laden einer Rollenvorlage bleiben allgemeine Makros erhalten. Fehlende Charaktermakros werden bei verfügbarer Client-API angelegt. Bei einem gleichnamigen Charaktermakro mit anderem Inhalt bleibt die aktuelle Belegung erhalten.
 
-**Berufspost:** Vor- und Nachnamen mit Leerzeichen als Empfänger eintragen. An der Mailbox dockt das Fenster rechts an; erst **Senden** startet den Versand. Weitere Briefe folgen nach Bestätigung, **Stoppen** verhindert weitere Briefe. Materialien für mehrere Berufe werden übersprungen. Vor dem Versand wird jeder Anhang geprüft. Gebundene oder gesperrte Gegenstände werden übersprungen; vorhandene Anhänge, Geld oder Nachnahme blockieren den Start. Nach Fehlern verbliebene Anhänge im normalen Briefentwurf prüfen.
+**Berufspost:** Vor- und Nachnamen mit Leerzeichen als Empfänger eintragen. An der Mailbox dockt das Fenster rechts an; erst **Senden** startet den Versand. Weitere Briefe folgen nach Bestätigung, **Stoppen** verhindert weitere Briefe. Gemeinsam genutzte Materialien können an jeden passenden Beruf gehen. Mit **Senden** beim gewünschten Beruf wählst du den Empfänger für alle passenden Stapel in deinen Taschen. Vor dem Versand wird jeder Anhang geprüft. Gebundene oder gesperrte Gegenstände werden übersprungen; vorhandene Anhänge, Geld oder Nachnahme blockieren den Start. Nach Fehlern verbliebene Anhänge im normalen Briefentwurf prüfen.
 
 Die Berufspost erkennt unterstützte Materialien anhand ihrer Gegenstands-ID.
 

@@ -15,7 +15,9 @@ M.groups = {
 }
 function M.Matches(group, itemID)
     local mask = itemID and Buddy.MailMaterials[itemID]
-    return mask ~= nil and (group[3] == 0 or mask == group[3])
+    local profession = group[3]
+    -- Each profession is one bit. The remainder isolates that bit and the lower bits.
+    return mask ~= nil and (profession == 0 or mask % (profession * 2) >= profession)
 end
 function Buddy.LoadMail()
     local style = Buddy.Style
