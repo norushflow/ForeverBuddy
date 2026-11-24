@@ -56,9 +56,15 @@ if arg[1]=='disabled' then
  init.scripts.OnEvent(init,'PLAYER_LOGIN')
  assert(ForeverbuddyMinimapButton)
  assert(afterCalls==0 and #tickers==0,'disabled modules must schedule no background work')
+ assert(not ForeverbuddyRotationBar and SlashCmdList.BUDDYROTATION)
+ local listeners=0
  for _,f in ipairs(frames) do
-  assert(next(f.events)==nil and not f.scripts.OnUpdate,'disabled modules leave no event processing/polling')
+  if f.events.PLAYER_REGEN_ENABLED then
+   listeners=listeners+1
+   assert(f.events.ADDON_LOADED and f.events.PLAYER_REGEN_DISABLED)
+  else assert(next(f.events)==nil and not f.scripts.OnUpdate) end
  end
+ assert(listeners==1)
  print('PASS: disabled modules do not initialize; minimap remains available')
  return
 end

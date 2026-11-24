@@ -1,4 +1,4 @@
-# ForeverBuddy 1.1.18
+# ForeverBuddy 1.1.19
 
 <p align="center"><img src="branding/icon-400.png" alt="ForeverBuddy" width="160" height="160"></p>
 
@@ -15,6 +15,8 @@ Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, A
 [Berufspost neben dem WoW-Briefkasten](branding/screenshots/profession-mail.webp) · [Schadens- und Heilungsanzeige](branding/screenshots/meters.webp)
 
 ## Funktionen
+
+- BuddyRotation im Zauberbuch: Zauberfolgen erstellen, bearbeiten, auf die Aktionsleiste ziehen und löschen.
 
 - Charakterübersicht mit Volk, Fraktionsfilter, angelegter Gegenstandsstufe und geschätzten Ruhe-EP anhand des letzten bekannten Ruheorts.
 - Dungeon-Transmog und eigene Schadens-/Heilungsanzeige.

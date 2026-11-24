@@ -3,7 +3,7 @@
 ## Notes: Characters, transmog, damage meters, action bars and profession mail for Forever.
 ## Notes-deDE: Charaktere, Transmog, Schadensanzeige, Aktionsleisten und Berufspost für Forever.
 ## Author: norushflow
-## Version: 1.1.18
+## Version: 1.1.19
 ## X-Curse-Project-ID: 1791314
 ## X-Wago-ID: QKyq35K7
 ## IconTexture: Interface\AddOns\Foreverbuddy\Media\BuddyIcon
@@ -21,4 +21,5 @@ Modules/Bars/Main.lua
 Modules/MailMaterials.lua
 Modules/Mail.lua
 Modules/Gather.lua
+Modules/BuddyRotation.lua
 Initialize.lua
