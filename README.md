@@ -16,7 +16,7 @@ Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, A
 
 ## Funktionen
 
-- BuddyRotation im Zauberbuch: Zauberfolgen erstellen, bearbeiten, auf die Aktionsleiste ziehen und löschen.
+- BuddyRotation (frühe Testversion) im Zauberbuch: Zauberfolgen erstellen, bearbeiten, auf die Aktionsleiste ziehen und löschen.
 
 - Charakterübersicht mit Volk, Fraktionsfilter, angelegter Gegenstandsstufe und geschätzten Ruhe-EP anhand des letzten bekannten Ruheorts.
 - Dungeon-Transmog und eigene Schadens-/Heilungsanzeige.

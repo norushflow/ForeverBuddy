@@ -4,7 +4,7 @@ local de = GetLocale() == "deDE"
 local function tr(german, english) return de and german or english end
 local panel, title, nameBox, hint
 local controls = {rows={}, actions={}}
-local draft, editing, spells
+local draft, editing, spells, resetMode
 local leftPage, rightPage = 1, 1
 local draw
 local function records()
@@ -51,6 +51,7 @@ end
 local function start(index)
     editing, draft, spells = index, {}, spellList()
     local old = records()[index]
+    resetMode=old and old.resetMode or "none"
     if old then
         for i, step in ipairs(old.steps) do draft[i] = step end
     end
@@ -59,18 +60,123 @@ local function start(index)
     draw()
 end
 
+local runners = {}
+local function launcher(key,steps,mode)
+    local opening = {}
+    for _,step in ipairs(steps) do
+        if step.oncePerTarget then opening[#opening+1]=step.name end
+    end
+    local lines = {}
+    if #opening>0 then
+        lines[1]="/castsequence reset=target "..table.concat(opening,", ")..", null"
+    end
+    if #opening<#steps then
+        if mode=="target" then
+            local cycle={}
+            for _,step in ipairs(steps) do
+                if not step.oncePerTarget then
+                    for attempt=1,step.repeats or 1 do cycle[#cycle+1]=step.name end
+                end
+            end
+            lines[#lines+1]="/castsequence reset=target "..table.concat(cycle,", ")
+        else
+            lines[#lines+1]="/click ForeverBuddySequence" .. key
+        end
+    end
+    return table.concat(lines,"\n")
+end
+
+local function configure(key, steps, mode)
+    local runner = runners[key]
+    if not runner then
+        runner = CreateFrame("Button","ForeverBuddySequence"..key,UIParent,"SecureActionButtonTemplate,SecureHandlerStateTemplate")
+        runner:RegisterForClicks("LeftButtonUp")
+        runner:SetAttribute("useOnKeyDown",false)
+        SecureHandlerWrapScript(runner,"OnClick",runner,[[
+            local count = self:GetAttribute("count")
+            if not count or count == 0 then return end
+            local step = self:GetAttribute("next") or 1
+            self:SetAttribute("spell",self:GetAttribute("step"..step))
+            self:SetAttribute("next",step % count + 1)
+        ]])
+        runner:SetAttribute("_onstate-rotationcombat",[[
+            if newstate == "in" and self:GetAttribute("resetCombat") then
+                self:SetAttribute("next",1)
+            end
+        ]])
+
+        runners[key]=runner
+    end
+    if mode=="combat" and not runner.combatDriver then
+        RegisterStateDriver(runner,"rotationcombat","[combat] in; out")
+        runner.combatDriver=true
+    end
+    runner:SetAttribute("resetCombat",mode=="combat")
+    local count=0
+    for _,step in ipairs(steps) do
+        if not step.oncePerTarget then
+            for attempt=1,step.repeats or 1 do
+                count=count+1
+                runner:SetAttribute("step"..count,step.name)
+            end
+        end
+    end
+    runner:SetAttribute("count",count)
+    runner:SetAttribute("spell",count>0 and runner:GetAttribute("step1") or nil)
+    runner:SetAttribute("next",1)
+    runner:SetAttribute("type",count>0 and "spell" or nil)
+end
+
+local function macroBody(index)
+    local body=select(3,GetMacroInfo(index))
+    if type(body)=="string" then return (body:gsub("\r\n","\n"):gsub("%s+$","")) end
+end
+
+local function applySequence(old,key,steps,mode)
+    local body = launcher(key,steps,mode)
+    if #body>255 then
+        return nil,tr("Folge zu lang für ein Makro.", "Sequence exceeds the macro length limit.")
+    end
+    -- Existing action-bar macros must have a live target even before the
+    -- character macro list is available during login.
+    if mode~="target" then configure(key,steps,mode) end
+    local index, scope = Bars.MacroLookup(key)
+    local icon = steps[1].icon or 134400
+    local actual=index and macroBody(index)
+    local ok=old and index and actual==body
+    local previous=old and old.body and old.body:gsub("\r\n","\n"):gsub("%s+$","")
+    if not ok and old and index and actual==previous then
+        ok=pcall(EditMacro,index,key,icon,body)
+    elseif scope=="missing" then
+        ok=pcall(CreateMacro,key,icon,body,true)
+    end
+    index=Bars.MacroLookup(key)
+    if not ok or not index or macroBody(index)~=body then
+        return nil,tr("Makro prüfen: freier Platz oder manuelle Änderung.","Check macro space or external edits.")
+    end
+    return body
+end
+
+local function sync(record)
+    local ok,body,problem=pcall(applySequence,record,record.key,record.steps,record.resetMode)
+    if ok and body then record.body=body end
+    if not ok then return tostring(body) end
+    return problem
+end
+
+local function restoreSequences()
+    if InCombatLockdown() then return end
+    for _,record in ipairs(records()) do
+        local problem=sync(record)
+        if problem then print("BuddyRotation ("..record.label.."): "..problem) end
+    end
+end
+
 local function save()
     if InCombatLockdown() then return end
     local label = nameBox:GetText():match("^%s*(.-)%s*$")
     if label == "" or #draft == 0 then
         hint:SetText(tr("Name und Zauber fehlen?", "Enter a name and choose a spell."))
-        return
-    end
-    local names = {}
-    for i, spell in ipairs(draft) do names[i] = spell.name end
-    local body = "#showtooltip\n/castsequence " .. table.concat(names, ", ")
-    if #body > 255 then
-        hint:SetText(tr("Folge zu lang. Bitte einen Schritt entfernen.", "Sequence too long. Remove a step."))
         return
     end
     local old = records()[editing]
@@ -84,23 +190,14 @@ local function save()
             if scope == "api" or not scope then return hint:SetText("Macro API?") end
         until scope == "missing"
     end
-    local index, scope = Bars.MacroLookup(key)
-    local icon = draft[1].icon or 134400
-    local ok
-    if old and index and select(3, GetMacroInfo(index)) == old.body then
-        ok = pcall(EditMacro, index, key, icon, body)
-    elseif scope == "missing" then
-        ok = pcall(CreateMacro, key, icon, body, true)
-    end
-    index = Bars.MacroLookup(key)
-    if not ok or not index or select(3, GetMacroInfo(index)) ~= body then
-        hint:SetText(tr("Makro prüfen: freier Platz oder manuelle Änderung.", "Check macro space or external edits."))
-        return
-    end
-    records()[editing or (#records()+1)] = {label=label, steps=draft, body=body, key=key}
-    Buddy.char.rotationSerial = serial
-    draft, editing, leftPage = nil, nil, 1
+    local record={label=label,steps=draft,key=key,resetMode=resetMode,body=old and old.body}
+    records()[editing or (#records()+1)]=record
+    Buddy.char.rotationSerial=serial
+    local problem=sync(record)
+    draft,editing,leftPage=nil,nil,1
     draw()
+    hint:SetText(tr("Gespeichert: ","Saved: ")..label..(problem and (" — "..problem) or ""))
+
 end
 
 local function requestDelete()
@@ -124,6 +221,7 @@ local function requestDelete()
                     return
                 end
             end
+            configure(target.key,{})
             table.remove(records(),editing)
             editing,draft,leftPage=nil,nil,1
             draw()
@@ -154,14 +252,25 @@ local function button(x,y,w,label,click,drag,kind)
             b.text:SetWordWrap(false)
             b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
         end
-        b:RegisterForDrag("LeftButton")
+
         controls[pool][used[pool]]=b
     end
     if row then b.text:SetText(label) else b:SetText(label) end
     b:ClearAllPoints()
     b:SetPoint("TOPLEFT",x,-y)
     b:SetSize(w,32)
-    b:SetScript("OnClick",click)
+    if kind=="counter" then b:RegisterForClicks("LeftButtonUp","RightButtonUp")
+    else b:RegisterForClicks("LeftButtonUp") end
+    if kind=="counter" then
+        b:SetScript("OnClick",nil)
+        b:SetScript("OnMouseUp",function(self,mouse)
+            if self:IsMouseOver() and (mouse=="LeftButton" or mouse=="RightButton") then click(self,mouse) end
+        end)
+    else
+        b:SetScript("OnMouseUp",nil)
+        b:SetScript("OnClick",click)
+    end
+    if drag then b:RegisterForDrag("LeftButton") else b:RegisterForDrag() end
     b:SetScript("OnDragStart",drag)
     b:Show()
 end
@@ -204,6 +313,24 @@ draw = function()
         hint:SetText(tr("Folge in die Aktionsleiste ziehen","Drag a sequence onto your action bar"))
         return
     end
+    local modes={{"none",tr("Aus","Off")},{"combat",tr("Kampf","Combat")},{"target",tr("Zielwechsel","Target")}}
+    local x=12
+    for _,option in ipairs(modes) do
+        local mode,label=option[1],option[2]
+        local width=mode=="target" and 96 or 58
+        if mode==resetMode then
+            label="|TInterface\\Buttons\\UI-CheckBox-Check:16:16|t"..label
+        end
+        button(x,43,width,label,function()
+            if InCombatLockdown() then return end
+            resetMode=mode
+            draw()
+        end)
+        x=x+width+1
+    end
+    if resetMode=="target" then
+        hint:SetText(tr("Zielwechsel: Nächster Schritt nach erfolgreichem Zauber.","Target reset: advance after a successful spell."))
+    end
     page(spells,leftPage,12,function(n) leftPage=n end,function(_,spell,y)
         button(12,y,201,caption(spell),function()
             draft[#draft+1]=spell
@@ -212,7 +339,14 @@ draw = function()
         end,nil,"paper")
     end)
     page(draft,rightPage,232,function(n) rightPage=n end,function(i,spell,y)
-        button(230,y,183,i.."  "..caption(spell),nil,nil,"step")
+        button(230,y,129,i.."  "..caption(spell),nil,nil,"step")
+        button(359,y,54,spell.oncePerTarget and tr("1×/Ziel","1×/unit") or (spell.repeats or 1).."×",function(_,mouseButton)
+            local current=spell.oncePerTarget and 6 or (spell.repeats or 1)
+            local delta=mouseButton=="RightButton" and -1 or 1
+            local nextMode=(current-1+delta)%6+1
+            draft[i]={name=spell.name,icon=spell.icon,oncePerTarget=nextMode==6,repeats=nextMode==6 and 1 or nextMode}
+            draw()
+        end,nil,"counter")
         for k,delta in ipairs({-1,1}) do
             button(414+(k-1)*37,y,36,delta==-1 and tr("Auf","Up") or tr("Ab","Dn"),function()
                 local j=i+delta
@@ -355,6 +489,8 @@ local function attachBooks()
 end
 
 function Buddy.InitializeRotation()
+    local pendingRestore=InCombatLockdown()
+    restoreSequences()
     attachBooks()
     if hooksecurefunc and ShowUIPanel then
         hooksecurefunc("ShowUIPanel",function(frame)
@@ -383,6 +519,12 @@ function Buddy.InitializeRotation()
     events:SetScript("OnEvent",function(_,event)
         if event=="PLAYER_REGEN_DISABLED" then
             if panel then panel:Hide() end
-        else attachBooks() end
+        else
+            if pendingRestore and not InCombatLockdown() then
+                restoreSequences()
+                pendingRestore=false
+            end
+            attachBooks()
+        end
     end)
 end
