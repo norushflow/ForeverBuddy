@@ -1,6 +1,6 @@
-# ForeverBuddy 1.1.19
+# NoRushFlow – ForeverBuddy 1.1.19
 
-<p align="center"><img src="branding/icon-400.png" alt="ForeverBuddy" width="160" height="160"></p>
+<p align="center"><img src="branding/icon-400.png" alt="NoRushFlow – ForeverBuddy" width="160" height="160"></p>
 
 Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, Aktionsleisten-Vorlagen und den Versand von Berufsmaterialien.
 
