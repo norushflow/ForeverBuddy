@@ -190,3 +190,8 @@ addon.L["Einige Hervorhebungsoptionen konnten nicht zurückgesetzt werden."] = "
 addon.L["Der Client unterstützt nur einen Teil der Hervorhebungsoptionen."] = "The client supports only some highlighting settings."
 
 addon.L["Bankcharakter"] = "Bank character"
+
+addon.L["Verbrauchsgüter · Bearbeitungsmodus"] = "Consumables · Edit mode"
+addon.L["Essen und Trinken"] = "Food and drink"
+addon.L["Verbrauchsgüter"] = "Consumables"
+addon.L["Verbrauchsgüterleisten sind in diesem Client nicht verfügbar."] = "Consumable bars are unavailable in this client."

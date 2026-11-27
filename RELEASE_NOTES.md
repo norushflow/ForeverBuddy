@@ -1,5 +1,5 @@
-# v1.1.20
+# v1.1.21
 
-- Hide the two spell and ability cooldown messages briefly after a BuddyRotation macro on WoW Forever. Other error messages still appear.
-- Fix a Lua error when opening the rotation editor on spellbooks that use numeric texture IDs.
-- Use the standalone BuddyRotation editor when both addons are enabled. The built-in editor is available when the standalone addon is disabled.
+- Add two optional clickable bag-driven bars for food and drink and other usable consumables on WoW Forever.
+- Show combined stack counts, cooldowns, and item tooltips. Sort food and drink by restoration where the tooltip provides a value.
+- Move both bars independently in edit mode and lock their positions per character. Secure item assignments stay fixed during combat.

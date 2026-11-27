@@ -6,6 +6,8 @@ Buddy.modules = {
     {key="meters", name=L["Schaden und Heilung"], loader="LoadMeters", command="FOREVERBUDDYMETERS"},
     {key="bars", name=L["Aktionsleisten"], loader="LoadBars", command="FOREVERBUDDYBARS", argument="status"},
     {key="mail", name=L["Berufspost"], loader="LoadMail", command="FOREVERBUDDYMAIL"},
+    {key="consumables", name=L["Verbrauchsgüter"], loader="LoadConsumables",
+        command="FOREVERBUDDYCONSUMABLES", defaultEnabled=false},
 }
 function Buddy.Foreign(frame, action)
     if (issecretvalue and issecretvalue(frame)) or not frame then return false end
@@ -36,6 +38,30 @@ function Buddy.OpenModule(module)
         end
     end
 end
+function Buddy.SetConsumablesLockIcon(button, editing)
+    local state = editing and "Unlocked" or "Locked"
+    button:SetNormalTexture("Interface\\Buttons\\LockButton-" .. state .. "-Up")
+    button:SetPushedTexture("Interface\\Buttons\\LockButton-" .. state .. "-Down")
+    for _, texture in ipairs({button:GetNormalTexture(), button:GetPushedTexture()}) do
+        texture:SetTexCoord(.12, .88, .12, .88)
+    end
+end
+
+function Buddy.CreateConsumablesLock(parent, editing, onClick)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetSize(24, 24)
+    button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    Buddy.SetConsumablesLockIcon(button, editing)
+    button:SetScript("OnClick", onClick)
+    button:SetScript("OnEnter", function(self)
+        local tooltip = Buddy.Style.Tooltip(self, "ANCHOR_RIGHT")
+        tooltip:SetText(L["Verbrauchsgüter · Bearbeitungsmodus"])
+        Buddy.Style.ShowTooltip()
+    end)
+    button:SetScript("OnLeave", Buddy.Style.HideTooltip)
+    return button
+end
+
 function Buddy.Toggle()
     if not Buddy.panel then
         local style = Buddy.Style
@@ -76,6 +102,17 @@ function Buddy.Toggle()
                 if Buddy.loaded.bars and Buddy.Bars then Buddy.Bars.menuButton=button end
                 button:SetText(Buddy.loaded.bars and Buddy.Bars and Buddy.Bars.RowText and Buddy.Bars.RowText()
                     or L["Aktionsleisten · Modul aus"])
+            elseif entry.key=="consumables" then
+                button:SetWidth(276)
+                button:SetText(entry.name)
+                local lock = Buddy.CreateConsumablesLock(panel, Buddy.consumablesEditing,
+                    function()
+                        if Buddy.loaded.consumables then SlashCmdList.FOREVERBUDDYCONSUMABLES()
+                        else Buddy.OpenModule(entry) end
+                    end)
+                lock:SetSize(30, 30)
+                lock:SetPoint("LEFT", button, "RIGHT", 6, 0)
+                Buddy.consumablesMenuLock = lock
             else
                 button:SetText(entry.name .. ((entry.key=="meters") and L[" ein / aus"] or L[" öffnen"]))
             end

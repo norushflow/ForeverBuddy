@@ -74,12 +74,13 @@ assert(not Buddy.Schedule and not Buddy.LoadClock and not Buddy.LoadSchedule)
 assert(not Buddy.db.clock and not Buddy.db.schedule and not Buddy.db.enabled.clock and not Buddy.db.enabled.schedule)
 assert(not SlashCmdList.MIDNIGHTEVENTFEED and not ForeverbuddyClockFrame and not ForeverbuddySchedulePanel)
 for _,f in ipairs(frames) do assert(not f.events.EVENT_SCHEDULER_UPDATE) end
-local expected={characters=true,transmog=true,meters=true,bars=true,mail=true}
-assert(#Buddy.modules==5)
+local expected={characters=true,transmog=true,meters=true,bars=true,mail=true,consumables=true}
+assert(#Buddy.modules==6)
+assert(Buddy.db.enabled.consumables==false and not Buddy.loaded.consumables)
 for _,m in ipairs(Buddy.modules) do assert(expected[m.key] and type(Buddy[m.loader])=='function');expected[m.key]=nil end
 assert(next(expected)==nil)
 local originalOpen=Buddy.OpenModule
-local aliases={chars='characters',transmog='transmog',meter='meters'}
+local aliases={chars='characters',transmog='transmog',meter='meters',consumables='consumables'}
 for alias,key in pairs(aliases) do
  Buddy.OpenModule=function(m) assert(m.key==key) end
  SlashCmdList.FOREVERBUDDY(alias)
@@ -322,6 +323,8 @@ print('PASS: shared tooltip guard')
 
 -- Menu items close the hub; the inline action bar controls stay accessible.
 for _,module in ipairs(Buddy.modules) do
+    local loaded=Buddy.loaded[module.key]
+    Buddy.loaded[module.key]=true
     local handler=SlashCmdList[module.command]
     local called=false
     SlashCmdList[module.command]=function() called=true end
@@ -333,5 +336,6 @@ for _,module in ipairs(Buddy.modules) do
         assert(called and not Buddy.panel:IsShown(),"module must close the hub: "..module.key)
     end
     SlashCmdList[module.command]=handler
+    Buddy.loaded[module.key]=loaded
 end
 print('PASS: menu closes for modules and stays open for action bars')

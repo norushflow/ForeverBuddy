@@ -1,4 +1,4 @@
-# ForeverBuddy 1.1.20
+# ForeverBuddy 1.1.21
 
 <p align="center"><img src="branding/icon-400.png" alt="ForeverBuddy" width="160" height="160"></p>
 
@@ -50,6 +50,8 @@ Die automatische Sicherung bleibt unter `ForeverbuddyCharDB.actions` erhalten. G
 **Berufspost:** Vor- und Nachnamen mit Leerzeichen als Empfänger eintragen. An der Mailbox dockt das Fenster rechts an; erst **Senden** startet den Versand. Weitere Briefe folgen nach Bestätigung, **Stoppen** verhindert weitere Briefe. Gemeinsam genutzte Materialien können an jeden passenden Beruf gehen. Mit **Senden** beim gewünschten Beruf wählst du den Empfänger für alle passenden Stapel in deinen Taschen. Vor dem Versand wird jeder Anhang geprüft. Gebundene oder gesperrte Gegenstände werden übersprungen; vorhandene Anhänge, Geld oder Nachnahme blockieren den Start. Nach Fehlern verbliebene Anhänge im normalen Briefentwurf prüfen.
 
 Die Berufspost erkennt unterstützte Materialien anhand ihrer Gegenstands-ID.
+
+**Verbrauchsgüter:** Im Menü `/fb` das Modul anhaken und `/reload` ausführen. Essen und Trinken sowie Tränke, Verbände und weitere benutzbare Verbrauchsgüter erscheinen in zwei Leisten aus dem eigenen Taschenbestand. Das Schloss neben **Verbrauchsgüter** schaltet den Bearbeitungsmodus um. Bei offenem Schloss lassen sich beide Leisten an ihren Überschriften ziehen. Das Schloss an einer Leiste fixiert beide Positionen. Der Befehl `/fb consumables` schaltet den Modus ebenfalls um. Die Positionen bleiben pro Charakter gespeichert. Im Kampf bleiben die Item-Zuordnungen fest, Stapelzahlen und Cooldowns laufen weiter.
 
 ## Änderungen und Entwicklung
 
