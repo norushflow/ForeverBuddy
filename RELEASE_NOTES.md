@@ -1,5 +1,5 @@
-# v1.1.19
+# v1.1.20
 
-- BuddyRotation is an early test feature for WoW Forever. Feedback from in-game testing is welcome.
-- Open BuddyRotation in the spellbook, build a sequence, then drag it to your action bar. Press the same button for each step.
-- Set repetitions, choose a once-per-target opener, and select a reset mode. A check mark identifies the selected mode. Target-change mode uses a cast sequence and can wait for an unavailable spell.
+- Hide the two spell and ability cooldown messages briefly after a BuddyRotation macro on WoW Forever. Other error messages still appear.
+- Fix a Lua error when opening the rotation editor on spellbooks that use numeric texture IDs.
+- Use the standalone BuddyRotation editor when both addons are enabled. The built-in editor is available when the standalone addon is disabled.

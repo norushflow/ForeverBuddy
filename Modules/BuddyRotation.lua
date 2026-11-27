@@ -61,6 +61,35 @@ local function start(index)
 end
 
 local runners = {}
+local quietUntil
+local cooldownErrors = {
+    ERR_ABILITY_COOLDOWN = true,
+    ERR_SPELL_COOLDOWN = true,
+}
+
+local function isCooldownError(errorType, message)
+    if Bars.Number(errorType) and GetGameMessageInfo then
+        local name = GetGameMessageInfo(errorType)
+        if Bars.Text(name) and cooldownErrors[name] then return true end
+    end
+    return Bars.Text(message) and
+        (message == ERR_ABILITY_COOLDOWN or message == ERR_SPELL_COOLDOWN)
+end
+
+local function installCooldownFilter()
+    local frame = UIErrorsFrame
+    if not frame or frame:IsForbidden() or frame:IsProtected() or InCombatLockdown() then return end
+    local onEvent = frame:GetScript("OnEvent")
+    if not onEvent then return end
+    frame:SetScript("OnEvent", function(self, event, errorType, message, ...)
+        if event == "UI_ERROR_MESSAGE" and quietUntil and GetTime() <= quietUntil and
+            isCooldownError(errorType, message) then
+            return
+        end
+        return onEvent(self, event, errorType, message, ...)
+    end)
+end
+
 local function launcher(key,steps,mode)
     local opening = {}
     for _,step in ipairs(steps) do
@@ -134,6 +163,9 @@ end
 
 local function applySequence(old,key,steps,mode)
     local body = launcher(key,steps,mode)
+    -- Leave room for existing sequences that already reach the macro limit.
+    local quietBody = "/brq\n"..body
+    if #quietBody<=255 then body=quietBody end
     if #body>255 then
         return nil,tr("Folge zu lang für ein Makro.", "Sequence exceeds the macro length limit.")
     end
@@ -376,7 +408,7 @@ local function pageArt(frame,depth)
         if region:IsObjectType("Texture") and region:IsVisible() then
             local atlas=region:GetAtlas()
             local path=region.GetTextureFilePath and region:GetTextureFilePath()
-            local key=(atlas or path or ""):lower()
+            local key=(Bars.Text(atlas) and atlas or Bars.Text(path) and path or ""):lower()
             if region:GetWidth()>220 and region:GetHeight()>220 and
                 (key:find("parchment") or key:find("spellbook") and
                 (key:find("background") or key:find("page") or key:find("interior"))) then
@@ -489,7 +521,13 @@ local function attachBooks()
 end
 
 function Buddy.InitializeRotation()
+    if SlashCmdList.BUDDYROTATION then return end
+    SLASH_BUDDYROTATIONQUIET1="/brq"
+    SlashCmdList.BUDDYROTATIONQUIET=function()
+        quietUntil=GetTime()+0.25
+    end
     local pendingRestore=InCombatLockdown()
+    if not pendingRestore then installCooldownFilter() end
     restoreSequences()
     attachBooks()
     if hooksecurefunc and ShowUIPanel then
@@ -521,6 +559,7 @@ function Buddy.InitializeRotation()
             if panel then panel:Hide() end
         else
             if pendingRestore and not InCombatLockdown() then
+                installCooldownFilter()
                 restoreSequences()
                 pendingRestore=false
             end

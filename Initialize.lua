@@ -34,7 +34,10 @@ events:SetScript("OnEvent",function(_,event,name)
         end
     elseif event=="PLAYER_LOGIN" then
         if Buddy.InitializeGatherHighlight then Buddy.InitializeGatherHighlight() end
-        if Buddy.InitializeRotation then Buddy.InitializeRotation() end
+        local isLoaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+        if Buddy.InitializeRotation and not (isLoaded and isLoaded("BuddyRotation")) then
+            Buddy.InitializeRotation()
+        end
         Buddy.CreateMinimap()
         events:UnregisterEvent("PLAYER_LOGIN")
     end
