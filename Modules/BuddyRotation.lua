@@ -3,7 +3,7 @@ local Bars = Buddy.Bars
 local de = GetLocale() == "deDE"
 local function tr(german, english) return de and german or english end
 local panel, title, nameBox, hint
-local controls = {rows={}, actions={}}
+local controls = {rows={}, actions={}, mouseovers={}}
 local draft, editing, spells, resetMode
 local leftPage, rightPage = 1, 1
 local draw
@@ -61,6 +61,89 @@ local function start(index)
 end
 
 local runners = {}
+local questionIcon = 134400
+local tooltipLine = "#showtooltip\n"
+local actionBars = {
+    "ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton",
+    "MultiBarRightButton", "MultiBarLeftButton", "MultiBar5Button",
+    "MultiBar6Button", "MultiBar7Button",
+}
+local iconLayers = {}
+local refreshPending
+
+local function normalizedMacroBody(body)
+    if Bars.Text(body) then return (body:gsub("\r\n","\n"):gsub("%s+$","")) end
+end
+
+local function queueIconRefresh()
+    if refreshPending or not C_Timer then return end
+    refreshPending = true
+    C_Timer.After(0, function()
+        refreshPending = false
+        local getText = C_ActionBar and C_ActionBar.GetActionText or GetActionText
+        local getTexture = C_ActionBar and C_ActionBar.GetActionTexture or GetActionTexture
+        local macroRunners = {}
+        for _, prefix in ipairs(actionBars) do
+            for slot = 1, 12 do
+                local button = _G[prefix .. slot]
+                if button and not button:IsForbidden() then
+                    local icon = button.icon or button.Icon
+                    local action = button.action
+                    if not Bars.Number(action) then action = button:GetAttribute("action") end
+                    local texture
+                    if icon and Bars.Number(action) then
+                        local runner = macroRunners[action]
+                        if runner == nil then
+                            local kind, index = Bars.Call(GetActionInfo, action)
+                            if kind == "macro" then
+                                local name = Bars.Call(getText, action)
+                                if Bars.Text(name) then
+                                    local candidate = runners[name]
+                                    index = candidate and candidate.rotationBody and Bars.MacroLookup(name) or nil
+                                end
+                                if Bars.Number(index) then
+                                    local actual, _, body = Bars.Call(GetMacroInfo, index)
+                                    runner = actual and runners[actual]
+                                    if not (runner and runner.rotationBody and
+                                        runner.rotationBody == normalizedMacroBody(body)) then
+                                        runner = nil
+                                    end
+                                end
+                            end
+                            macroRunners[action] = runner or false
+                        end
+                        if runner then
+                            if runner.rotationBody:sub(1, #tooltipLine) == tooltipLine then
+                                -- A native once-per-target opener takes precedence while WoW reports its icon.
+                                texture = Bars.Call(getTexture, action)
+                            end
+                            if not texture or texture == questionIcon then
+                                local step = runner:GetAttribute("next")
+                                texture = runner.rotationIcons[step]
+                            end
+                        end
+                    end
+                    local layer = iconLayers[button]
+                    if texture then
+                        -- Blizzard may repaint its own texture during the same click.
+                        if not layer then
+                            layer = button:CreateTexture(nil, "ARTWORK", nil, 1)
+                            layer:SetAllPoints(icon)
+                            layer:SetTexCoord(icon:GetTexCoord())
+                            iconLayers[button] = layer
+                        end
+                        layer:SetTexture(texture)
+                        layer:SetVertexColor(icon:GetVertexColor())
+                        layer:Show()
+                    elseif layer then
+                        layer:Hide()
+                    end
+                end
+            end
+        end
+    end)
+end
+
 local quietUntil
 local cooldownErrors = {
     ERR_ABILITY_COOLDOWN = true,
@@ -90,47 +173,108 @@ local function installCooldownFilter()
     end)
 end
 
-local function launcher(key,steps,mode)
-    local opening = {}
-    for _,step in ipairs(steps) do
-        if step.oncePerTarget then opening[#opening+1]=step.name end
-    end
-    local lines = {}
-    if #opening>0 then
-        lines[1]="/castsequence reset=target "..table.concat(opening,", ")..", null"
-    end
-    if #opening<#steps then
-        if mode=="target" then
-            local cycle={}
-            for _,step in ipairs(steps) do
-                if not step.oncePerTarget then
-                    for attempt=1,step.repeats or 1 do cycle[#cycle+1]=step.name end
-                end
-            end
-            lines[#lines+1]="/castsequence reset=target "..table.concat(cycle,", ")
-        else
-            lines[#lines+1]="/click ForeverBuddySequence" .. key
+local function mouseoverOptions(steps)
+    local options = {}
+    local api = C_Spell
+    local helpful = api and api.IsSpellHelpful or IsHelpfulSpell
+    local harmful = api and api.IsSpellHarmful or IsHarmfulSpell
+    for i, step in ipairs(steps) do
+        if step.mouseover == true then
+            local help = Bars.Call(helpful, step.name)
+            local harm = Bars.Call(harmful, step.name)
+            local condition = help and "[@mouseover,help,nodead]" or ""
+            if harm then condition = condition .. "[@mouseover,harm,nodead]" end
+            if condition ~= "" then options[i] = condition end
         end
     end
-    return table.concat(lines,"\n")
+    return options
 end
 
-local function configure(key, steps, mode)
+local function castSequence(steps, options, once, resetTarget)
+    local names, condition = {}
+    for i, step in ipairs(steps) do
+        if (not not step.oncePerTarget) == once then
+            local current = options[i] or ""
+            if condition and condition ~= current then
+                if not resetTarget then return end
+                return nil, once
+                    and tr("Bei 1×/Ziel brauchen alle Zauber dieselbe Zielbedingung.",
+                        "Once-per-target spells must share the same targeting condition.")
+                    or tr("Bei Zielwechsel brauchen alle wiederholten Zauber dieselbe Zielbedingung.",
+                        "With Target reset, repeating spells must share the same targeting condition.")
+            end
+            condition = current
+            for _ = 1, once and 1 or (step.repeats or 1) do
+                names[#names + 1] = step.name
+            end
+        end
+    end
+    if #names == 0 or (not resetTarget and condition == "") then return end
+    if once then names[#names + 1] = "null" end
+    if condition ~= "" then condition = condition .. "[] " end
+    local reset = resetTarget and "reset=target " or ""
+    return "/castsequence " .. condition .. reset .. table.concat(names, ", ")
+end
+
+local function launcher(key, steps, mode, options)
+    local opening, problem = castSequence(steps, options, true, true)
+    if problem then return nil, problem end
+    local lines = {opening}
+    local cycle
+    if mode == "target" then
+        cycle, problem = castSequence(steps, options, false, true)
+        if problem then return nil, problem end
+    elseif mode == "none" then
+        -- A shared mouseover condition lets WoW advance only after each successful cast.
+        cycle = castSequence(steps, options, false, false)
+        if cycle and #cycle + (opening and #opening + 1 or 0) > 255 then cycle = nil end
+    end
+    if cycle then
+        lines[#lines + 1] = cycle
+    elseif mode ~= "target" then
+        for _, step in ipairs(steps) do
+            if not step.oncePerTarget then
+                lines[#lines + 1] = "/click ForeverBuddySequence" .. key
+                break
+            end
+        end
+    end
+    local body = table.concat(lines,"\n")
+    -- Leave room for existing sequences that already reach the macro limit.
+    local quietBody = "/brq\n"..body
+    if #quietBody<=255 then body=quietBody end
+    if #body>255 then
+        return nil,tr("Folge zu lang für ein Makro.", "Sequence exceeds the macro length limit.")
+    end
+    if (opening or cycle) and #body + #tooltipLine <= 255 then
+        body = tooltipLine .. body
+    end
+    return body
+end
+
+local function configure(key, steps, mode, options)
     local runner = runners[key]
     if not runner then
         runner = CreateFrame("Button","ForeverBuddySequence"..key,UIParent,"SecureActionButtonTemplate,SecureHandlerStateTemplate")
         runner:RegisterForClicks("LeftButtonUp")
         runner:SetAttribute("useOnKeyDown",false)
+        runner.RefreshRotationIcon = queueIconRefresh
         SecureHandlerWrapScript(runner,"OnClick",runner,[[
             local count = self:GetAttribute("count")
             if not count or count == 0 then return end
             local step = self:GetAttribute("next") or 1
             self:SetAttribute("spell",self:GetAttribute("step"..step))
+            local condition = self:GetAttribute("mouseover"..step)
+            local unit
+            if condition then unit = SecureCmdOptionParse(condition .. " mouseover") end
+            self:SetAttribute("unit", unit)
             self:SetAttribute("next",step % count + 1)
+            self:CallMethod("RefreshRotationIcon")
         ]])
         runner:SetAttribute("_onstate-rotationcombat",[[
-            if newstate == "in" and self:GetAttribute("resetCombat") then
+            if newstate == "out" and self:GetAttribute("resetCombat") then
                 self:SetAttribute("next",1)
+                self:CallMethod("RefreshRotationIcon")
             end
         ]])
 
@@ -141,43 +285,47 @@ local function configure(key, steps, mode)
         runner.combatDriver=true
     end
     runner:SetAttribute("resetCombat",mode=="combat")
+    runner.rotationIcons = {}
     local count=0
-    for _,step in ipairs(steps) do
+    for i,step in ipairs(steps) do
         if not step.oncePerTarget then
             for attempt=1,step.repeats or 1 do
                 count=count+1
                 runner:SetAttribute("step"..count,step.name)
+                runner:SetAttribute("mouseover"..count,options[i])
+                runner.rotationIcons[count] = step.icon or questionIcon
             end
         end
     end
     runner:SetAttribute("count",count)
     runner:SetAttribute("spell",count>0 and runner:GetAttribute("step1") or nil)
+    runner:SetAttribute("unit",nil)
     runner:SetAttribute("next",1)
     runner:SetAttribute("type",count>0 and "spell" or nil)
 end
 
 local function macroBody(index)
-    local body=select(3,GetMacroInfo(index))
-    if type(body)=="string" then return (body:gsub("\r\n","\n"):gsub("%s+$","")) end
+    return normalizedMacroBody(select(3,GetMacroInfo(index)))
 end
 
-local function applySequence(old,key,steps,mode)
-    local body = launcher(key,steps,mode)
-    -- Leave room for existing sequences that already reach the macro limit.
-    local quietBody = "/brq\n"..body
-    if #quietBody<=255 then body=quietBody end
-    if #body>255 then
-        return nil,tr("Folge zu lang für ein Makro.", "Sequence exceeds the macro length limit.")
+local function applySequence(record, body, options)
+    local key, steps, mode = record.key, record.steps, record.resetMode
+    if not body then
+        options = mouseoverOptions(steps)
+        local problem
+        body, problem = launcher(key, steps, mode, options)
+        if not body then return nil, problem end
     end
     -- Existing action-bar macros must have a live target even before the
     -- character macro list is available during login.
-    if mode~="target" then configure(key,steps,mode) end
+    if mode~="target" then configure(key,steps,mode,options) end
     local index, scope = Bars.MacroLookup(key)
-    local icon = steps[1].icon or 134400
+    local dynamic = body:sub(1, #tooltipLine) == tooltipLine
+    local icon = dynamic and questionIcon or steps[1].icon or questionIcon
     local actual=index and macroBody(index)
-    local ok=old and index and actual==body
-    local previous=old and old.body and old.body:gsub("\r\n","\n"):gsub("%s+$","")
-    if not ok and old and index and actual==previous then
+    local ok=index and actual==body
+    local previous=normalizedMacroBody(record.body)
+    if not ok and index and actual==previous then
         ok=pcall(EditMacro,index,key,icon,body)
     elseif scope=="missing" then
         ok=pcall(CreateMacro,key,icon,body,true)
@@ -186,11 +334,17 @@ local function applySequence(old,key,steps,mode)
     if not ok or not index or macroBody(index)~=body then
         return nil,tr("Makro prüfen: freier Platz oder manuelle Änderung.","Check macro space or external edits.")
     end
+    local runner = runners[key]
+    if runner then
+        local click = "/click ForeverBuddySequence" .. key
+        runner.rotationBody = body:sub(-#click) == click and body or nil
+        queueIconRefresh()
+    end
     return body
 end
 
-local function sync(record)
-    local ok,body,problem=pcall(applySequence,record,record.key,record.steps,record.resetMode)
+local function sync(record, body, options)
+    local ok,body,problem=pcall(applySequence,record,body,options)
     if ok and body then record.body=body end
     if not ok then return tostring(body) end
     return problem
@@ -222,10 +376,16 @@ local function save()
             if scope == "api" or not scope then return hint:SetText("Macro API?") end
         until scope == "missing"
     end
+    local options = mouseoverOptions(draft)
+    local body, problem = launcher(key, draft, resetMode, options)
+    if not body then
+        hint:SetText(problem)
+        return
+    end
     local record={label=label,steps=draft,key=key,resetMode=resetMode,body=old and old.body}
     records()[editing or (#records()+1)]=record
     Buddy.char.rotationSerial=serial
-    local problem=sync(record)
+    problem=sync(record,body,options)
     draft,editing,leftPage=nil,nil,1
     draw()
     hint:SetText(tr("Gespeichert: ","Saved: ")..label..(problem and (" — "..problem) or ""))
@@ -253,7 +413,7 @@ local function requestDelete()
                     return
                 end
             end
-            configure(target.key,{})
+            configure(target.key,{},nil,{})
             table.remove(records(),editing)
             editing,draft,leftPage=nil,nil,1
             draw()
@@ -262,10 +422,40 @@ local function requestDelete()
     StaticPopup_Show(dialog,record.label,nil,record)
 end
 
-local used = {rows=0,actions=0}
+local used = {rows=0,actions=0,mouseovers=0}
 local paperTitle, nameLabel
 local function lettering(parent, font)
     return parent:CreateFontString(nil,"OVERLAY",font)
+end
+local function mouseoverCheckbox(y, i, step)
+    used.mouseovers = used.mouseovers + 1
+    local checkbox = controls.mouseovers[used.mouseovers]
+    if not checkbox then
+        checkbox = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+        checkbox:SetSize(24, 24)
+        checkbox:SetHitRectInsets(0, -60, 0, 0)
+        local label = lettering(checkbox, "GameFontNormalSmall")
+        label:SetPoint("LEFT", checkbox, "RIGHT", 0, 0)
+        label:SetTextColor(.18,.10,.045)
+        label:SetShadowOffset(0,0)
+        label:SetText("Mouseover")
+        controls.mouseovers[used.mouseovers] = checkbox
+    end
+    checkbox:ClearAllPoints()
+    checkbox:SetPoint("TOPLEFT", 528, -y - 4)
+    checkbox:SetChecked(step.mouseover == true)
+    checkbox:SetScript("OnClick", function(self)
+        if InCombatLockdown() then
+            self:SetChecked(step.mouseover == true)
+            return
+        end
+        local updated = {}
+        for key, value in pairs(step) do updated[key] = value end
+        updated.mouseover = self:GetChecked() == true
+        draft[i] = updated
+        draw()
+    end)
+    checkbox:Show()
 end
 local function button(x,y,w,label,click,drag,kind)
     local row = kind=="paper" or kind=="step"
@@ -362,6 +552,9 @@ draw = function()
     end
     if resetMode=="target" then
         hint:SetText(tr("Zielwechsel: Nächster Schritt nach erfolgreichem Zauber.","Target reset: advance after a successful spell."))
+    elseif resetMode=="combat" then
+        hint:SetText(tr("Kampf: Nach Kampfende beginnt die Folge wieder bei Schritt 1.",
+            "Combat: The sequence resets to step 1 when combat ends."))
     end
     page(spells,leftPage,12,function(n) leftPage=n end,function(_,spell,y)
         button(12,y,201,caption(spell),function()
@@ -376,7 +569,8 @@ draw = function()
             local current=spell.oncePerTarget and 6 or (spell.repeats or 1)
             local delta=mouseButton=="RightButton" and -1 or 1
             local nextMode=(current-1+delta)%6+1
-            draft[i]={name=spell.name,icon=spell.icon,oncePerTarget=nextMode==6,repeats=nextMode==6 and 1 or nextMode}
+            draft[i]={name=spell.name,icon=spell.icon,oncePerTarget=nextMode==6,repeats=nextMode==6 and 1 or nextMode,
+                mouseover=spell.mouseover}
             draw()
         end,nil,"counter")
         for k,delta in ipairs({-1,1}) do
@@ -394,6 +588,7 @@ draw = function()
             rightPage=math.max(1,math.min(rightPage,math.ceil(#draft/8)))
             draw()
         end)
+        mouseoverCheckbox(y, i, spell)
     end)
     if editing then button(12,425,112,tr("Löschen","Delete"),requestDelete) end
     button(230,425,112,tr("Zurück","Back"),function() draft=nil leftPage=1 draw() end)
@@ -431,7 +626,7 @@ local function toggle(book)
     if panel and panel:IsShown() then panel:Hide() return end
     if not panel then
         panel=CreateFrame("Frame",nil,UIParent)
-        panel:SetSize(530,495)
+        panel:SetSize(620,495)
         panel:SetClampedToScreen(true)
         panel:EnableMouse(true)
         paper=panel:CreateTexture(nil,"BACKGROUND")
@@ -551,19 +746,29 @@ function Buddy.InitializeRotation()
         for book in pairs(tabs) do if book:IsVisible() then toggle(book) return end end
     end
     local events=CreateFrame("Frame")
+    for _, event in ipairs({
+        "ACTIONBAR_SLOT_CHANGED", "ACTIONBAR_PAGE_CHANGED", "PLAYER_ENTERING_WORLD",
+        "UPDATE_MACROS", "UPDATE_SHAPESHIFT_FORM", "PLAYER_TARGET_CHANGED",
+    }) do
+        events:RegisterEvent(event)
+    end
+    events:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
     events:RegisterEvent("ADDON_LOADED")
     events:RegisterEvent("PLAYER_REGEN_ENABLED")
     events:RegisterEvent("PLAYER_REGEN_DISABLED")
     events:SetScript("OnEvent",function(_,event)
+        if event=="PLAYER_REGEN_DISABLED" or event=="PLAYER_REGEN_ENABLED" then queueIconRefresh() end
         if event=="PLAYER_REGEN_DISABLED" then
             if panel then panel:Hide() end
-        else
+        elseif event=="ADDON_LOADED" or event=="PLAYER_REGEN_ENABLED" then
             if pendingRestore and not InCombatLockdown() then
                 installCooldownFilter()
                 restoreSequences()
                 pendingRestore=false
             end
             attachBooks()
+        else
+            queueIconRefresh()
         end
     end)
 end

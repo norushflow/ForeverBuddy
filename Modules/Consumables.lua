@@ -2,6 +2,7 @@ local _, Buddy = ...
 local L = Buddy.L
 local SIZE, STEP, INSET, COLUMNS = 30, 34, 6, 7
 local HEADER = 24
+local arrows = {LEFT = {-1, 0}, RIGHT = {1, 0}, UP = {0, 1}, DOWN = {0, -1}}
 
 -- Forever exposes item use descriptions, but no numeric food-restoration field.
 local function foodRecovery(link)
@@ -51,7 +52,7 @@ function Buddy.LoadConsumables()
     end
     local bars, stock, pending = {}, {}, {}
     local editing, ready = false, false
-    local setEditing
+    local setEditing, keyboard, selectedBar
 
     local function place(bar, x, y)
         bar:ClearAllPoints()
@@ -62,11 +63,27 @@ function Buddy.LoadConsumables()
         bar.handle:SetScript("OnUpdate", nil)
     end
 
+    local function move(bar, x, y)
+        place(bar, x, y)
+        positions[bar.positionKey] = {x = bar:GetLeft(), y = bar:GetBottom(), bottom = true}
+    end
+
+    local function selectBar(bar)
+        if selectedBar then selectedBar.label:SetTextColor(unpack(style.Color.gold)) end
+        selectedBar = bar
+        if selectedBar then
+            selectedBar.label:SetTextColor(unpack(style.Color.text))
+            keyboard:SetPropagateKeyboardInput(true)
+        end
+        keyboard:SetShown(selectedBar ~= nil)
+    end
+
     local function makeBar(key, title, defaultX)
         local bar = CreateFrame("Frame", nil, UIParent)
         bar:SetFrameStrata("MEDIUM")
         bar:SetClampedToScreen(true)
         bar.editBorder = style.Border(bar)
+        bar.positionKey = key
         bar.buttons, bar.active, bar.legacyPosition = {}, 0, false
         bar:SetSize(190, HEADER + INSET)
         local saved = positions[key]
@@ -86,10 +103,12 @@ function Buddy.LoadConsumables()
         handle:SetHeight(HEADER)
         handle:EnableMouse(true)
         local label = style.Text(handle, "small", style.Color.gold)
+        bar.label = label
         label:SetPoint("LEFT", INSET, 0)
         label:SetText(title)
         handle:SetScript("OnMouseDown", function(_, mouseButton)
             if mouseButton ~= "LeftButton" or not editing or InCombatLockdown() then return end
+            selectBar(bar)
             local scale = UIParent:GetEffectiveScale()
             local mouseX, mouseY = GetCursorPosition()
             local startX, startY = bar:GetLeft(), bar:GetBottom()
@@ -100,8 +119,7 @@ function Buddy.LoadConsumables()
                     return
                 end
                 local x, y = GetCursorPosition()
-                place(bar, startX + (x - mouseX) / scale, startY + (y - mouseY) / scale)
-                positions[key] = {x = bar:GetLeft(), y = bar:GetBottom(), bottom = true}
+                move(bar, startX + (x - mouseX) / scale, startY + (y - mouseY) / scale)
             end)
         end)
         handle:SetScript("OnMouseUp", function(_, mouseButton)
@@ -296,6 +314,7 @@ function Buddy.LoadConsumables()
         if InCombatLockdown() then Buddy.Message(L["Bitte das Kampfende abwarten."]); return end
         if not ready then return end
         for _, bar in ipairs(bars) do stopDrag(bar) end
+        selectBar(nil)
         editing = value
         Buddy.consumablesEditing = editing
         if Buddy.consumablesMenuLock then
@@ -327,10 +346,32 @@ function Buddy.LoadConsumables()
     events:SetScript("OnEvent", function(_, event, itemID, success)
         if event == "PLAYER_REGEN_DISABLED" then
             for _, bar in ipairs(bars) do stopDrag(bar) end
+            if keyboard then selectBar(nil) end
             return
         end
         if not ready then
             if InCombatLockdown() then return end
+            -- Keep keyboard capture independent of the protected item buttons.
+            keyboard = CreateFrame("Frame", nil, UIParent)
+            keyboard:Hide()
+            keyboard:EnableKeyboard(true)
+            keyboard:SetScript("OnKeyDown", function(self, key)
+                if InCombatLockdown() then return end
+                local delta = arrows[key]
+                local typing = GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()
+                local bar = editing and not typing and delta and selectedBar
+                local x, y
+                if bar then x, y = bar:GetLeft(), bar:GetBottom() end
+                local canMove = x ~= nil and y ~= nil
+                self:SetPropagateKeyboardInput(not canMove)
+                if canMove then
+                    stopDrag(bar)
+                    move(bar, x + delta[1], y + delta[2])
+                end
+            end)
+            keyboard:SetScript("OnKeyUp", function(self)
+                if not InCombatLockdown() then self:SetPropagateKeyboardInput(true) end
+            end)
             bars[1] = makeBar("food", L["Essen und Trinken"], -250)
             bars[2] = makeBar("usable", L["Verbrauchsgüter"], 15)
             ready = true

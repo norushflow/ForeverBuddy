@@ -1,12 +1,12 @@
 local frames, bags, requested = {}, {}, {}
-local combat, mouseDown = false, false
+local combat, mouseDown, keyboardFocus = false, false, nil
 local cursorX, cursorY = 100, 100
 local function noop() end
 local methods = {}
 function methods:SetScript(key, script) self.scripts[key] = script end
 function methods:GetScript(key) return self.scripts[key] end
 function methods:RegisterEvent(key) self.events[key] = true end
-function methods:SetShown(value) assert(not combat); self.shown = value end
+function methods:SetShown(value) assert(not combat or rawget(self, "keyboardEnabled")); self.shown = value end
 function methods:Show() self:SetShown(true) end
 function methods:Hide() self:SetShown(false) end
 function methods:SetSize() assert(not combat) end
@@ -22,6 +22,8 @@ function methods:SetFrameLevel(level) self.frameLevel = level end
 function methods:GetEffectiveScale() return 1 end
 function methods:SetAttribute(key, value) assert(not combat); self.attributes[key] = value end
 function methods:SetText(value) self.text = value end
+function methods:EnableKeyboard(value) self.keyboardEnabled = value end
+function methods:SetPropagateKeyboardInput(value) assert(not combat); self.propagate = value end
 function methods:SetCooldown(start, duration) self.duration = duration end
 function methods:SetDesaturated(value) self.desaturated = value end
 function methods:SetOwner(owner) self.owner = owner end
@@ -42,6 +44,7 @@ end
 function InCombatLockdown() return combat end
 function IsMouseButtonDown(button) return button == "LeftButton" and mouseDown end
 function GetCursorPosition() return cursorX, cursorY end
+function GetCurrentKeyBoardFocus() return keyboardFocus end
 UIParent, GameTooltip, SlashCmdList = object(), object(), {}
 GameTooltip.Show = noop
 GameTooltip.Hide = function(self) self.owner = false end
@@ -86,7 +89,8 @@ local Buddy = {
     end,
     consumablesMenuLock = {},
     SetConsumablesLockIcon = function(button, editing) button.editing = editing end,
-    Style = {Border = function() return {object()} end, Color = {}, Text = function(parent) local text = object(); text.parent = parent; return text end,
+    Style = {Border = function() return {object()} end, Color = {gold = {1, .82, .44}, text = {1, 1, 1}},
+        Text = function(parent) local text = object(); text.parent = parent; return text end,
         Button = function(frame) return frame end, Icon = function(frame) return frame end},
 }
 assert(loadfile("Modules/Consumables.lua"))("Foreverbuddy", Buddy)
@@ -140,10 +144,42 @@ handle.scripts.OnMouseDown(handle, "LeftButton")
 handle.scripts.OnMouseUp(handle, "LeftButton")
 mouseDown = false
 assert(not handle.scripts.OnUpdate)
+local keyboard
+for _, frame in ipairs(frames) do
+    if rawget(frame, "keyboardEnabled") then keyboard = frame end
+end
+local function press(key) keyboard.scripts.OnKeyDown(keyboard, key) end
+assert(keyboard.shown)
+press("RIGHT")
+press("UP")
+assert(not keyboard.propagate and food.parent.x == 81 and food.parent.y == 1)
+assert(Buddy.char.consumables.food.x == 81 and Buddy.char.consumables.food.y == 1)
+press("DOWN")
+assert(Buddy.char.consumables.food.y == 0)
+press("W")
+assert(keyboard.propagate and food.parent.x == 81)
+local potionX = potion.parent.x
+potion.parent.handle.scripts.OnMouseDown(potion.parent.handle, "LeftButton")
+potion.parent.handle.scripts.OnMouseUp(potion.parent.handle, "LeftButton")
+press("LEFT")
+assert(potion.parent.x == potionX - 1 and food.parent.x == 81)
+assert(Buddy.char.consumables.usable.x == potionX - 1)
+keyboardFocus = {}
+press("LEFT")
+assert(keyboard.propagate and potion.parent.x == potionX - 1)
+keyboardFocus = nil
+combat = true
+event("PLAYER_REGEN_DISABLED")
+assert(not keyboard.shown)
+press("RIGHT")
+assert(potion.parent.x == potionX - 1)
+combat = false
+event("PLAYER_REGEN_ENABLED")
 food.parent.lock.scripts.OnClick()
 assert(not handle.shown and not food.parent.lock.shown and not Buddy.consumablesMenuLock.editing)
 assert(food.parent.point == "BOTTOMLEFT" and food.parent.y == 0)
 assert(food.parent.editBorder[1].shown == false)
+assert(not keyboard.shown)
 
 combat = true
 event("PLAYER_REGEN_DISABLED")

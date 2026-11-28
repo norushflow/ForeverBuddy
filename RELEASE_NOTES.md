@@ -1,5 +1,6 @@
-# v1.1.21
+# v1.1.22
 
-- Add two optional clickable bag-driven bars for food and drink and other usable consumables on WoW Forever.
-- Show combined stack counts, cooldowns, and item tooltips. Sort food and drink by restoration where the tooltip provides a value.
-- Move both bars independently in edit mode and lock their positions per character. Secure item assignments stay fixed during combat.
+- Fine-tune both consumable bar positions with the arrow keys in edit mode.
+- Add optional mouseover targeting per spell for healing and damage.
+- Show the next spell on the default action bar.
+- Reset combat sequences when combat ends and advance on the next press if the opener is out of range.
