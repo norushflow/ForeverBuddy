@@ -1,5 +1,13 @@
 # ForeverBuddy 1.1.22
 
+> **Wechsel zu NoRushFlow am 30. November 2026**
+>
+> Die Entwicklung dieses Addons endet am 30. November 2026. Ab der Veröffentlichung geht es im gemeinsamen Addon [NoRushFlow](https://www.curseforge.com/wow/addons/norushflow) für Retail und Forever weiter. Für den Einstellungsimport NoRushFlow beim ersten Login neben diesem Addon aktiv lassen und dieses Addon anschließend deaktivieren.
+
+> **Moving to NoRushFlow on November 30, 2026**
+>
+> Development of this addon ends on November 30, 2026. [NoRushFlow](https://www.curseforge.com/wow/addons/norushflow) is its successor for Retail and Forever and will be available after release. To import your settings, enable NoRushFlow alongside this addon for the first login, then disable this addon.
+
 <p align="center"><img src="branding/icon-400.png" alt="ForeverBuddy" width="160" height="160"></p>
 
 Eine kompakte Zentrale für Charaktere, Dungeon-Transmog, Schaden und Heilung, Aktionsleisten-Vorlagen und den Versand von Berufsmaterialien.
